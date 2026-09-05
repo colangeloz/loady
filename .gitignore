@@ -1,0 +1,51 @@
+# ── macOS ────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Xcode build output ───────────────────────────────────────────────────
+build/
+DerivedData/
+*.dSYM
+*.dSYM.zip
+*.hmap
+*.moved-aside
+
+# ── Xcode per-user state ─────────────────────────────────────────────────
+# The project file itself IS committed (it's how `open Loady.xcodeproj` works
+# with zero setup). Only per-user junk — window positions, breakpoints, the
+# last scheme you selected — is ignored.
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# ── Swift Package Manager ────────────────────────────────────────────────
+.build/
+.swiftpm/xcode/
+.swiftpm/configuration/
+Packages/
+# NOTE: Package.resolved is deliberately NOT ignored. This is an application,
+# not a library — pinning exact dependency revisions is what makes a build
+# reproducible, and CI keys its cache off this file's hash.
+
+# ── Code signing material — MUST NEVER BE COMMITTED ──────────────────────
+# These go in GitHub Actions secrets, never in git. Public repo or private,
+# a leaked signing identity lets someone ship malware as you.
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+.env
+*.local
+
+# ── Release artifacts ────────────────────────────────────────────────────
+*.dmg
+*.zip
+Release/
+
+# ── Instruments ──────────────────────────────────────────────────────────
+*.trace
+
+# NOTE: Tests/**/Fixtures/ is intentionally NOT ignored. Recorded hardware
+# fixtures are the whole strategy for testing Macs we don't own.

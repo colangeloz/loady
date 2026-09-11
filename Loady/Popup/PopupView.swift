@@ -46,6 +46,17 @@ struct ModuleToggleRow: View {
 
             Spacer()
 
+            if let icon = ActivityMonitor.icon {
+                Button { ActivityMonitor.open() } label: {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .frame(width: 26, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("Open Activity Monitor")
+            }
+
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .font(.system(size: 11))

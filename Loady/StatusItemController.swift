@@ -11,7 +11,10 @@ final class StatusItemController {
     private let profile = SystemProfile.current()
     private let registry: ModuleRegistry
 
-    private lazy var panel = PopupPanel(content: AnyView(PopupView(registry: registry)))
+    /// Built on open, torn down on close. A live `NSHostingView` keeps
+    /// re-running SwiftUI layout on every observable change even when its
+    /// window is hidden, which costs more than rebuilding it each time.
+    private var panel: PopupPanel?
 
     /// One row of module readouts inside the button.
     private let stack = NSStackView()
@@ -66,11 +69,10 @@ final class StatusItemController {
         let current = registry.enabled.map(\.module)
         guard current != laidOutModules else { return }
         laidOutModules = current
+        registry.sync()
 
-        // The panel's height depends on how many sections it shows. Re-measure
-        // it, keeping the top edge pinned so it grows downward instead of
-        // jumping — which is what NSPopover used to do.
-        panel.resizeKeepingTopEdge()
+        // Only if it's actually on screen — never create one to resize it.
+        panel?.resizeKeepingTopEdge()
 
         for view in stack.arrangedSubviews {
             stack.removeArrangedSubview(view)
@@ -110,8 +112,6 @@ final class StatusItemController {
     }
 
     private func refresh() {
-        registry.sync()
-
         for (view, module) in zip(stack.arrangedSubviews, registry.enabled) {
             (view as? MenuBarModuleView)?.update(with: module.presentation)
         }
@@ -150,10 +150,22 @@ final class StatusItemController {
 
     private func togglePopover() {
         guard let button = statusItem.button else { return }
-        if panel.isOpen {
-            panel.close()
-        } else {
-            panel.show(below: button)
+
+        if let panel, panel.isOpen {
+            closePanel()
+            return
         }
+
+        let panel = PopupPanel(
+            content: AnyView(PopupView(registry: registry)),
+            onDismiss: { [weak self] in self?.closePanel() }
+        )
+        self.panel = panel
+        panel.show(below: button)
+    }
+
+    private func closePanel() {
+        panel?.close()
+        panel = nil
     }
 }

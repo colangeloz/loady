@@ -17,12 +17,14 @@ final class PopupPanel: NSPanel {
 
     private let hosting: NSHostingView<AnyView>
     private var dismissMonitor: Any?
+    private let onDismiss: () -> Void
 
     /// Gap below the menu bar, matching the system's own menus.
     private let topGap: CGFloat = 4
     private let cornerRadius: CGFloat = 16
 
-    init(content: AnyView) {
+    init(content: AnyView, onDismiss: @escaping () -> Void = {}) {
+        self.onDismiss = onDismiss
         hosting = NSHostingView(rootView: content)
         hosting.translatesAutoresizingMaskIntoConstraints = false
 
@@ -103,7 +105,7 @@ final class PopupPanel: NSPanel {
         dismissMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
-            Task { @MainActor in self?.close() }
+            Task { @MainActor in self?.onDismiss() }
         }
     }
 

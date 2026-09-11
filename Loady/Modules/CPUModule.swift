@@ -43,8 +43,9 @@ final class CPUModule: MetricModule {
     }
 
     func stop() {
-        task?.cancel()
-        task = nil
+        guard let task else { return }   // already stopped; don't spawn work
+        task.cancel()
+        self.task = nil
         Task { [sampler] in await sampler.stop() }
     }
 

@@ -85,3 +85,8 @@ public final class CPUReader {
         }
     }
 }
+
+// CPUReader already has the shape the protocol wants, so the conformance is
+// empty. Note it is NOT declared Sendable — that refusal is what makes the
+// compiler confine it to whichever Sampler owns it.
+extension CPUReader: MetricReader {}

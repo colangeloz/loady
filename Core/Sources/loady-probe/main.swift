@@ -6,6 +6,23 @@ import SystemMetrics
 
 let profile = SystemProfile.current()
 
+// `loady-probe --bench` measures what one sample actually costs. A system
+// monitor that shows up in its own "top processes" list has failed.
+if CommandLine.arguments.contains("--bench") {
+    let reader = CPUReader()
+    _ = reader.read()
+
+    let iterations = 1000
+    let start = DispatchTime.now().uptimeNanoseconds
+    for _ in 0 ..< iterations { _ = reader.read() }
+    let elapsed = DispatchTime.now().uptimeNanoseconds - start
+
+    let perSample = Double(elapsed) / Double(iterations)
+    print(String(format: "\n  %.1f µs per sample", perSample / 1000))
+    print(String(format: "  %.4f%% of one core at 1 Hz\n", perSample / 1_000_000_000 * 100))
+    exit(0)
+}
+
 func gigabytes(_ bytes: Int) -> String {
     String(format: "%.0f GB", Double(bytes) / 1_073_741_824)
 }

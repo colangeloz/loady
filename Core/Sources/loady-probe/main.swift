@@ -62,6 +62,26 @@ for tier in profile.cpu.tiers {
 // Load is a difference between two instants, so the first read only
 // establishes a baseline and returns nil. Sample once a second after that.
 
+// ── memory ───────────────────────────────────────────────────────────────
+if let mem = MemoryReader().read() {
+    func gb(_ b: Int) -> String { String(format: "%6.2f GB", Double(b) / 1_073_741_824) }
+
+    print("""
+
+  memory
+    app           \(gb(mem.app))
+    wired         \(gb(mem.wired))
+    compressed    \(gb(mem.compressed))
+    ─────────────────────────
+    used          \(gb(mem.used))   \(String(format: "%.1f%%", mem.usedFraction * 100))
+    cached files  \(gb(mem.cached))
+    free          \(gb(mem.free))
+    total         \(gb(mem.total))
+    swap used     \(gb(mem.swapUsed))
+    pressure      \(mem.pressure)
+""")
+}
+
 print("\n  sampling CPU for 5 seconds — compare against `top -l 2 -o cpu`\n")
 
 let reader = CPUReader()

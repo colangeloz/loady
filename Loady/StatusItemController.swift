@@ -1,91 +1,159 @@
 import AppKit
+import SwiftUI
 import SystemMetrics
 
-/// Owns the menu bar item and keeps it fed with CPU readings.
-///
-/// `@MainActor` means every method here runs on the main thread, and the
-/// compiler enforces it. That's what makes touching `statusItem.button` safe
-/// without a single `DispatchQueue.main.async` anywhere in the file.
+/// Owns the single menu bar item and keeps it showing whichever modules are
+/// enabled, side by side.
 @MainActor
 final class StatusItemController {
 
     private let statusItem: NSStatusItem
     private let profile = SystemProfile.current()
+    private let registry: ModuleRegistry
 
-    /// The reader lives *inside* this actor, on a background executor. It is
-    /// created by the closure rather than passed in, because `CPUReader` isn't
-    /// `Sendable` and therefore couldn't legally cross the boundary.
-    private let sampler = Sampler(interval: .seconds(1)) { CPUReader() }
+    private lazy var panel = PopupPanel(content: AnyView(PopupView(registry: registry)))
 
-    private var consumerTask: Task<Void, Never>?
+    /// One row of module readouts inside the button.
+    private let stack = NSStackView()
+
+    /// Which modules the current layout was built for. Compared each tick so
+    /// the item rebuilds when the user toggles something.
+    private var laidOutModules: [Module] = []
+
+    private var refreshTask: Task<Void, Never>?
 
     init() {
+        registry = ModuleRegistry(profile: profile)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = "me.colangelo.loady.statusitem"
 
         configureButton()
-        buildMenu()
-        startConsuming()
+        registry.sync()
+        startRefreshing()
     }
 
     deinit {
-        consumerTask?.cancel()
+        refreshTask?.cancel()
     }
+
+    // MARK: Menu bar item
 
     private func configureButton() {
         guard let button = statusItem.button else { return }
 
-        // Monospaced digits: with a proportional font "11.1%" and "8.8%" are
-        // different widths, so the item resizes every second and visibly
-        // shoves its menu bar neighbours around.
-        button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        button.title = "CPU  --.-%"
-        button.setAccessibilityLabel("CPU usage")
+        stack.orientation = .horizontal
+        stack.spacing = 10
+        stack.alignment = .centerY
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 6)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        button.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+            stack.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+        ])
+
+        button.target = self
+        button.action = #selector(handleClick)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
 
-    private func buildMenu() {
-        // An LSUIElement app has no Dock icon and no app menu, so this is the
-        // only way to quit it. Without it the user needs Activity Monitor.
-        let menu = NSMenu()
-        menu.addItem(
-            withTitle: "Quit Loady",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        )
-        statusItem.menu = menu
+    /// Rebuilds the row when the enabled set changes. Not on every tick —
+    /// tearing down and rebuilding views once a second would be wasteful and
+    /// would make the item visibly flicker.
+    private func rebuildIfNeeded() {
+        let current = registry.enabled.map(\.module)
+        guard current != laidOutModules else { return }
+        laidOutModules = current
+
+        // The panel's height depends on how many sections it shows. Re-measure
+        // it, keeping the top edge pinned so it grows downward instead of
+        // jumping — which is what NSPopover used to do.
+        panel.resizeKeepingTopEdge()
+
+        for view in stack.arrangedSubviews {
+            stack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        for module in registry.enabled {
+            stack.addArrangedSubview(MenuBarModuleView(module: module.module))
+        }
+
+        // An empty item would be invisible and unclickable, so keep a single
+        // icon as a handle back to the popup.
+        if registry.enabled.isEmpty {
+            stack.addArrangedSubview(MenuBarModuleView(module: .cpu, placeholder: true))
+        }
+
+        statusItem.length = stack.fittingSize.width
     }
 
-    private func startConsuming() {
-        // `Task { }` inside a @MainActor type inherits MainActor isolation, so
-        // the body already runs on the main thread. There is exactly ONE hop
-        // across the boundary — `await` on the sampler — and what comes back
-        // is a `CPUSample`, a Sendable value type.
-        consumerTask = Task { [weak self] in
-            guard let self else { return }
+    private func startRefreshing() {
+        // Display refresh is deliberately separate from sampling. Modules tick
+        // at their own rates (CPU 1s, memory 2s); this just reads whatever
+        // each currently has and paints it.
+        refreshTask = Task { [weak self] in
+            let clock = ContinuousClock()
+            var deadline = clock.now
 
-            // Subscribe before starting, so no early sample is missed.
-            let samples = await sampler.stream()
-            await sampler.start()
+            while !Task.isCancelled {
+                deadline = deadline.advanced(by: .seconds(1))
+                try? await clock.sleep(until: deadline, tolerance: .milliseconds(100))
+                if clock.now - deadline > .seconds(4) { deadline = clock.now }
 
-            for await sample in samples {
-                self.update(with: sample)
+                guard let self else { return }
+                self.rebuildIfNeeded()
+                self.refresh()
             }
         }
     }
 
-    private func update(with sample: CPUSample) {
-        guard let button = statusItem.button else { return }
+    private func refresh() {
+        registry.sync()
 
-        let percent = sample.busy * 100
-        button.title = String(format: "CPU %5.1f%%", percent)
+        for (view, module) in zip(stack.arrangedSubviews, registry.enabled) {
+            (view as? MenuBarModuleView)?.update(with: module.presentation)
+        }
 
-        // Per-tier detail for VoiceOver and the tooltip. On an M5 Pro this
-        // reads "Super 12%, Performance 6%"; on an Intel Mac, one figure.
-        let tiers = profile.cpu.tiers
-            .map { "\($0.name) \(Int((sample.busy(for: $0) * 100).rounded()))%" }
+        statusItem.length = stack.fittingSize.width
+
+        let summary = registry.enabled
+            .compactMap { m in m.presentation.map { "\(m.module.displayName) \($0.text)" } }
             .joined(separator: ", ")
+        statusItem.button?.toolTip = summary
+        statusItem.button?.setAccessibilityLabel(summary.isEmpty ? "Loady" : summary)
+    }
 
-        button.toolTip = tiers
-        button.setAccessibilityLabel("CPU \(Int(percent.rounded())) percent. \(tiers)")
+    // MARK: Clicks
+
+    @objc private func handleClick() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showContextMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
+    private func showContextMenu() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Quit Loady",
+                     action: #selector(NSApplication.terminate(_:)),
+                     keyEquivalent: "q")
+
+        // Assign, click to present, then clear — a permanently-assigned menu
+        // would intercept left-clicks and the popover could never open.
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    private func togglePopover() {
+        guard let button = statusItem.button else { return }
+        if panel.isOpen {
+            panel.close()
+        } else {
+            panel.show(below: button)
+        }
     }
 }

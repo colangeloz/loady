@@ -1,6 +1,6 @@
 # Loady
 
-A macOS menu bar system monitor, written from scratch in Swift 6.
+An ultra-lightweight native macOS menu bar system monitor.
 
 > **Status: early development.** Nothing to install yet.
 

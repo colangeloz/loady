@@ -20,8 +20,7 @@ xcuserdata/
 
 # ── Swift Package Manager ────────────────────────────────────────────────
 .build/
-.swiftpm/xcode/
-.swiftpm/configuration/
+.swiftpm/
 Packages/
 # NOTE: Package.resolved is deliberately NOT ignored. This is an application,
 # not a library — pinning exact dependency revisions is what makes a build

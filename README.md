@@ -5,7 +5,7 @@ A macOS menu bar system monitor, written from scratch in Swift 6.
 > **Status: early development.** Nothing to install yet.
 
 CPU, memory, disk, network, GPU and thermals, rendered live in the menu bar.
-Universal binary — Intel and Apple Silicon, macOS 13 (Ventura) and later.
+Universal binary — Intel and Apple Silicon, macOS 14 (Sonoma) and later.
 
 ## Why this exists
 

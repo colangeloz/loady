@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CA1F8EF13054B186007C01C5 /* SystemMetrics in Frameworks */ = {isa = PBXBuildFile; productRef = CA1F8EF03054B186007C01C5 /* SystemMetrics */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		CA99F672304CDB4E00CFD25A /* Loady.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Loady.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA1F8EF13054B186007C01C5 /* SystemMetrics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = Loady;
 			packageProductDependencies = (
+				CA1F8EF03054B186007C01C5 /* SystemMetrics */,
 			);
 			productName = Loady;
 			productReference = CA99F672304CDB4E00CFD25A /* Loady.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = CA99F669304CDB4E00CFD25A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CA1F8EEF3054B186007C01C5 /* XCLocalSwiftPackageReference "Core" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CA99F673304CDB4E00CFD25A /* Products */;
 			projectDirPath = "";
@@ -129,7 +138,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "arm64 x86_64";
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -193,7 +205,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "arm64 x86_64";
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -329,6 +344,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CA1F8EEF3054B186007C01C5 /* XCLocalSwiftPackageReference "Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Core;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CA1F8EF03054B186007C01C5 /* SystemMetrics */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SystemMetrics;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CA99F66A304CDB4E00CFD25A /* Project object */;
 }

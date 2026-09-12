@@ -17,7 +17,15 @@ public actor Sampler<Reader: MetricReader> {
 
     public typealias Sample = Reader.Sample
 
-    private let reader: Reader
+    /// Built on `start()`, released on `stop()`.
+    ///
+    /// Readers hold kernel resources — `CPUReader` takes a mach port right for
+    /// the lifetime of the instance. Constructing them eagerly means a module
+    /// the user never enables still costs ports, and stopping one never gives
+    /// them back.
+    private let make: @Sendable () -> Reader
+    private var reader: Reader?
+
     private var interval: Duration
     private var tickTask: Task<Void, Never>?
 
@@ -31,9 +39,9 @@ public actor Sampler<Reader: MetricReader> {
     ///   be handed across the boundary into this actor. Passing a `@Sendable`
     ///   closure instead means the reader is *created here*, on the actor's own
     ///   executor, and never exists anywhere else.
-    public init(interval: Duration, make: @Sendable () -> Reader) {
+    public init(interval: Duration, make: @escaping @Sendable () -> Reader) {
         self.interval = interval
-        self.reader = make()
+        self.make = make
     }
 
     deinit {
@@ -43,6 +51,7 @@ public actor Sampler<Reader: MetricReader> {
     /// Begins sampling. Idempotent — calling it twice does nothing.
     public func start() {
         guard tickTask == nil else { return }
+        if reader == nil { reader = make() }
         tickTask = Task { [weak self] in
             await self?.run()
         }
@@ -54,6 +63,7 @@ public actor Sampler<Reader: MetricReader> {
         tickTask = nil
         for listener in listeners.values { listener.finish() }
         listeners.removeAll()
+        reader = nil   // releases mach ports and IOKit handles
     }
 
     /// Changes the cadence. Takes effect on the next tick.
@@ -83,6 +93,7 @@ public actor Sampler<Reader: MetricReader> {
     }
 
     private func run() async {
+        guard let reader else { return }
         let clock = ContinuousClock()
 
         // Establishes the baseline. Delta-based readers have nothing to say

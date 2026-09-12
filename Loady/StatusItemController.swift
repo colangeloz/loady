@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import SwiftUI
 import SystemMetrics
 
@@ -16,19 +17,23 @@ final class StatusItemController {
     /// window is hidden, which costs more than rebuilding it each time.
     private var panel: PopupPanel?
 
-    /// One row of module readouts inside the button.
-    private let stack = NSStackView()
+    /// Which modules the current image was built for. Compared each tick so
+    /// the item rebuilds when the user toggles something. Optional rather than
+    /// empty, because "no modules enabled" is a real state that still needs a
+    /// first build — of the placeholder.
+    private var laidOutModules: [Module]?
 
-    /// Which modules the current layout was built for. Compared each tick so
-    /// the item rebuilds when the user toggles something.
-    private var laidOutModules: [Module] = []
+    /// Icons are stable for the life of a layout, so they're resolved once per
+    /// rebuild rather than once per tick.
+    private var icons: [NSImage?] = []
 
     private var refreshTask: Task<Void, Never>?
 
-    // Last values written to AppKit. Each of these costs a layout solve or an
-    // IPC round-trip, so they're only written when they actually change.
+    // Last values written to AppKit. Each costs an IPC round-trip, so they're
+    // only written when they actually change.
     private var lastLength: CGFloat = -1
     private var lastSummary = ""
+    private var lastTexts: [String?] = []
 
     init() {
         registry = ModuleRegistry(profile: profile)
@@ -49,27 +54,27 @@ final class StatusItemController {
     private func configureButton() {
         guard let button = statusItem.button else { return }
 
-        stack.orientation = .horizontal
-        stack.spacing = 10
-        stack.alignment = .centerY
-        stack.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 6)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        button.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: button.trailingAnchor),
-            stack.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-        ])
+        // The button gets an image, never subviews.
+        //
+        // NSStatusItem mirrors its item into "replicants" and refreshes them by
+        // snapshotting the button's view tree with cacheDisplayInRect. On Tahoe
+        // that snapshot re-arms itself continuously: measured at ~480 layout
+        // and draw passes a second, ~36% of a core, for a readout that changes
+        // once a second — and it ran at that rate no matter what we wrote, or
+        // whether we wrote anything at all. Rendering the row ourselves and
+        // assigning one image gives AppKit nothing to walk. Do not put custom
+        // subviews in this button.
+        button.imagePosition = .imageOnly
+        button.image = MenuBarRowImage.make(entries: [], height: NSStatusBar.system.thickness)
 
         button.target = self
         button.action = #selector(handleClick)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
 
-    /// Rebuilds the row when the enabled set changes. Not on every tick —
-    /// tearing down and rebuilding views once a second would be wasteful and
-    /// would make the item visibly flicker.
+    /// Re-resolves the module icons when the enabled set changes. Not on every
+    /// tick: icons are stable for a given layout, and looking up six SF Symbols
+    /// a second to draw the same glyphs would be wasted work.
     private func rebuildIfNeeded() {
         let current = registry.enabled.map(\.module)
         guard current != laidOutModules else { return }
@@ -79,21 +84,13 @@ final class StatusItemController {
         // Only if it's actually on screen — never create one to resize it.
         panel?.resizeKeepingTopEdge()
 
-        for view in stack.arrangedSubviews {
-            stack.removeArrangedSubview(view)
-            view.removeFromSuperview()
-        }
-        for module in registry.enabled {
-            stack.addArrangedSubview(MenuBarModuleView(module: module.module))
-        }
-
         // An empty item would be invisible and unclickable, so keep a single
         // icon as a handle back to the popup.
-        if registry.enabled.isEmpty {
-            stack.addArrangedSubview(MenuBarModuleView(module: .cpu, placeholder: true))
-        }
+        icons = current.isEmpty
+            ? [Module.cpu.icon(pointSize: 13)]
+            : current.map { $0.icon(pointSize: 13) }
 
-        statusItem.length = stack.fittingSize.width
+        lastTexts = []   // force the next refresh to redraw
     }
 
     private func startRefreshing() {
@@ -117,14 +114,24 @@ final class StatusItemController {
     }
 
     private func refresh() {
-        for (view, module) in zip(stack.arrangedSubviews, registry.enabled) {
-            (view as? MenuBarModuleView)?.update(with: module.presentation)
-        }
+        // nil text means "icon only", used for the placeholder item.
+        let texts: [String?] = registry.enabled.isEmpty
+            ? [nil]
+            : registry.enabled.map { $0.presentation?.text ?? "--" }
 
-        let width = stack.fittingSize.width
-        if width != lastLength {
-            lastLength = width
-            statusItem.length = width
+        // Redrawing and reassigning the image is an IPC round-trip, so it
+        // happens only when a readout actually changed.
+        if texts != lastTexts {
+            lastTexts = texts
+            let height = NSStatusBar.system.thickness
+            let entries = Array(zip(icons, texts)).map { (icon: $0.0, text: $0.1) }
+            let image = MenuBarRowImage.make(entries: entries, height: height)
+            statusItem.button?.image = image
+
+            if image.size.width != lastLength {
+                lastLength = image.size.width
+                statusItem.length = image.size.width
+            }
         }
 
         let summary = registry.enabled

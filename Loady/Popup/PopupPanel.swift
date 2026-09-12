@@ -38,6 +38,10 @@ final class PopupPanel: NSPanel {
             defer: false
         )
 
+        // ARC owns this panel: NSWindow otherwise releases itself on close,
+        // which with our own strong reference is an over-release.
+        isReleasedWhenClosed = false
+
         isFloatingPanel = true
         level = .popUpMenu              // above normal windows, below the menu bar
         isOpaque = false
@@ -84,9 +88,19 @@ final class PopupPanel: NSPanel {
         startWatchingForDismissal()
     }
 
-    func close(animated: Bool = true) {
+    /// Not named `close`: `NSWindow.close()` already exists, and a subclass
+    /// `close(...)` with every parameter defaulted does not shadow it, so the
+    /// body silently never runs. This is also the only place the monitor can be
+    /// removed — Swift 6 bars a nonisolated `deinit` from touching `NSEvent`'s
+    /// `Any` token.
+    func dismiss() {
         stopWatchingForDismissal()
+
+        // A live NSHostingView keeps re-evaluating its body even off screen.
+        hosting.rootView = AnyView(EmptyView())
+
         orderOut(nil)
+        close()
     }
 
     /// Re-measures after the content's height changes, keeping the top edge

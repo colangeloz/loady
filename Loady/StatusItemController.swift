@@ -178,7 +178,7 @@ final class StatusItemController {
     }
 
     private func closePanel() {
-        panel?.close()
+        panel?.dismiss()
         panel = nil
     }
 }

@@ -16,6 +16,7 @@ final class ModuleRegistry {
         all = [
             CPUModule(profile: profile),
             MemoryModule(),
+            DiskModule(),
         ]
     }
 

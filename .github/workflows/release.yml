@@ -1,0 +1,119 @@
+name: release
+
+# Tag-driven: `git tag v0.1.0 && git push --tags` cuts a release.
+# The tag is the single source of the version number — it names the DMG, the
+# GitHub Release, and CFBundleShortVersionString inside the app.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (for re-running a failed release)"
+        required: true
+
+permissions:
+  contents: write        # to create the Release and upload the DMG
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Written out rather than delegated to a marketplace action.
+      #
+      # The obvious candidate, apple-actions/import-codesign-certs, is not an
+      # Apple project despite the name: the org carries no verified domain and
+      # has no public members. This step handles the private half of a code
+      # signing identity, so it runs Apple's own `security` CLI and nothing
+      # else. Everything below is secret-derived and dies with the runner.
+      - name: Import signing certificate
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          # Protects a keychain that exists for the length of one job.
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Without this the keychain re-locks after five minutes idle, and
+          # notarization can take longer than that.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          # The step everyone misses: without the partition list, codesign
+          # cannot use the key non-interactively and fails with the opaque
+          # errSecInternalComponent — the same error a denied keychain prompt
+          # produces locally.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          # codesign only searches keychains on the search list.
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
+          [ -n "$IDENTITY" ] || { echo "::error::no Developer ID in the imported keychain"; exit 1; }
+          echo "DEVELOPER_ID=$IDENTITY" >> "$GITHUB_ENV"
+          echo "signing as: $IDENTITY"
+
+      # Notarization likewise stays as two plain xcrun commands inside
+      # make-dmg.sh. Every community action for it wraps those same commands.
+      - name: Build, sign, notarize and staple
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$NOTARY_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
+          trap 'rm -f "$NOTARY_KEY"' EXIT
+          ./Tools/make-dmg.sh
+
+      # Proves the artifact is distributable, rather than trusting that the
+      # steps above succeeded. Gatekeeper is the only opinion that counts.
+      - name: Verify Gatekeeper accepts the result
+        run: |
+          set -euo pipefail
+          DMG=".build/release/Loady-${{ steps.version.outputs.version }}.dmg"
+          xcrun stapler validate "$DMG"
+          spctl -a -t open --context context:primary-signature -v "$DMG"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            ".build/release/Loady-${{ steps.version.outputs.version }}.dmg" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --generate-notes
+
+      # Runs even when an earlier step failed: a signing key must never outlive
+      # the job, however the job ended.
+      - name: Remove the keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/cert.p12"

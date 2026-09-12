@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The metrics layer, on both architectures. The Intel runner is the point:
+  # page-size arithmetic, CPU tier detection and the IOKit parsing have never
+  # run on x86_64 anywhere else.
+  test:
+    name: test (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-26,       arch: arm64 }
+          - { runner: macos-26-intel, arch: x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version && sw_vers
+      - name: Build
+        run: swift build --package-path Core
+      - name: Test
+        run: swift test --package-path Core
+
+  # Universal binary, and proof it really is universal.
+  app:
+    name: app
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build -project Loady.xcodeproj -scheme Loady \
+            -configuration Release -destination 'platform=macOS' \
+            -derivedDataPath .build/ci \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual | tail -5
+      # Ad-hoc signed rather than CODE_SIGNING_ALLOWED=NO, deliberately.
+      # Unsigned binaries carry no entitlements at all, so the sandbox
+      # assertion below would pass on an app that becomes sandboxed the
+      # moment it is signed for release. Signing makes the check real.
+      - name: Assert universal, LSUIElement, and no sandbox
+        run: |
+          APP=.build/ci/Build/Products/Release/Loady.app
+          ARCHS=$(lipo -archs "$APP/Contents/MacOS/Loady" | tr ' ' '\n' | sort | tr '\n' ' ')
+          echo "archs: $ARCHS"
+          [ "$ARCHS" = "arm64 x86_64 " ] || { echo "::error::not universal"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist" | grep -q true \
+            || { echo "::error::LSUIElement missing"; exit 1; }
+          ENTS=$(codesign -d --entitlements - --xml "$APP" 2>/dev/null || true)
+          if grep -q app-sandbox <<<"$ENTS"; then
+            echo "::error::app-sandbox entitlement present (see ENABLE_APP_SANDBOX)"; exit 1
+          fi
+          # Proves the assertion above is live: if signing silently stopped
+          # embedding entitlements, absence of app-sandbox would be vacuous.
+          grep -q get-task-allow <<<"$ENTS" \
+            || { echo "::error::no entitlements embedded - sandbox check is vacuous"; exit 1; }
+          echo "universal, LSUIElement, signed, no sandbox"
+
+  # Dumps what each machine actually reports. This is how we get real Intel
+  # data without owning an Intel Mac — the artifacts become test fixtures.
+  probe:
+    name: probe (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-26,       arch: arm64 }
+          - { runner: macos-26-intel, arch: x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Machine profile
+        run: |
+          {
+            echo "## ${{ matrix.arch }} — $(sw_vers -productVersion)"
+            echo '```'
+            echo "hw.model             $(sysctl -n hw.model 2>/dev/null || echo -)"
+            echo "cpu                  $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo -)"
+            echo "hw.optional.arm64    $(sysctl -n hw.optional.arm64 2>/dev/null || echo 'absent (Intel)')"
+            echo "hw.pagesize          $(sysctl -n hw.pagesize)"
+            echo "hw.physicalcpu       $(sysctl -n hw.physicalcpu)"
+            echo "hw.logicalcpu        $(sysctl -n hw.logicalcpu)"
+            echo "hw.nperflevels       $(sysctl -n hw.nperflevels 2>/dev/null || echo -)"
+            for i in 0 1 2; do
+              n=$(sysctl -n hw.perflevel$i.name 2>/dev/null) || continue
+              echo "  perflevel$i        $n ($(sysctl -n hw.perflevel$i.physicalcpu) cores)"
+            done
+            echo "hw.cpufrequency      $(sysctl -n hw.cpufrequency 2>/dev/null || echo 'ENOENT (Apple Silicon)')"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the probe
+        run: swift run --package-path Core loady-probe 2>/dev/null | tee probe-${{ matrix.arch }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-${{ matrix.arch }}
+          path: probe-${{ matrix.arch }}.txt

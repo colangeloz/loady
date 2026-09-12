@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Xcode hosts SwiftUI previews by launching the app, so `@main` runs
+        // and every canvas refresh would add another menu bar item.
+        guard !ProcessInfo.processInfo.isRunningInXcodePreview else { return }
         statusItem = StatusItemController()
     }
 
@@ -14,5 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Without this, closing Settings would quit the whole app.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+}
+
+extension ProcessInfo {
+    var isRunningInXcodePreview: Bool {
+        environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
     }
 }

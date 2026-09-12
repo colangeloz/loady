@@ -50,3 +50,10 @@ struct MemorySection: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Memory") {
+    MemorySection(module: .preview())
+        .padding(16).frame(width: 268)
+}
+#endif

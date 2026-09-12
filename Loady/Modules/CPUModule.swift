@@ -12,7 +12,7 @@ final class CPUModule: MetricModule {
         didSet { Preferences.shared.setEnabled(isEnabled, for: module) }
     }
 
-    private(set) var latest: CPUSample?
+    fileprivate(set) var latest: CPUSample?
     private(set) var history: [Double] = []
     private let historyLimit = 60
 
@@ -62,3 +62,17 @@ final class CPUModule: MetricModule {
 
     func popupSection() -> AnyView { AnyView(CPUSection(module: self)) }
 }
+
+#if DEBUG
+extension CPUModule {
+    /// Seeded with fixed values and no sampler, for previews.
+    static func preview(busy: Double = 0.34) -> CPUModule {
+        let m = CPUModule(profile: .current())
+        m.latest = CPUSample(cores: (0..<18).map { i in
+            let v = busy + (Double(i % 4) * 0.06)
+            return CoreLoad(user: v, system: 0, nice: 0, idle: 1 - v)
+        })
+        return m
+    }
+}
+#endif

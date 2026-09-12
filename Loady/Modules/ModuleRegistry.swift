@@ -15,6 +15,14 @@ final class ModuleRegistry {
         didSet { Preferences.shared.moduleOrder = order }
     }
 
+    #if DEBUG
+    init(preview modules: [any MetricModule]) {
+        let lookup = Dictionary(uniqueKeysWithValues: modules.map { ($0.module, $0) })
+        byID = lookup
+        order = modules.map(\.module)
+    }
+    #endif
+
     init(profile: SystemProfile) {
         let modules: [any MetricModule] = [
             CPUModule(profile: profile),
@@ -48,3 +56,12 @@ final class ModuleRegistry {
     }
 }
 
+#if DEBUG
+extension ModuleRegistry {
+    /// Builds a registry from already-seeded modules, so previews render
+    /// fixed data and never start a sampler.
+    convenience init(previewModules: [any MetricModule]) {
+        self.init(preview: previewModules)
+    }
+}
+#endif

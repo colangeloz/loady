@@ -181,3 +181,12 @@ final class AnyBindableModule {
     }
 }
 
+#if DEBUG
+#Preview("Panel") {
+    PopupView(registry: ModuleRegistry(previewModules: [
+        CPUModule.preview(),
+        MemoryModule.preview(),
+        DiskModule.preview(),
+    ]))
+}
+#endif

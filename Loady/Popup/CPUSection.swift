@@ -38,3 +38,10 @@ struct CPUSection: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("CPU") {
+    CPUSection(module: .preview())
+        .padding(16).frame(width: 268)
+}
+#endif

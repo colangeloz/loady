@@ -35,4 +35,20 @@ final class Preferences {
     func setEnabled(_ enabled: Bool, for module: Module) {
         defaults.set(enabled, forKey: key(for: module))
     }
+
+    private let orderKey = "module.order"
+
+    /// Display order. Modules added in a later version won't be in a stored
+    /// order, so they're appended rather than silently dropped.
+    var moduleOrder: [Module] {
+        get {
+            let stored = (defaults.array(forKey: orderKey) as? [String] ?? [])
+                .compactMap(Module.init(rawValue:))
+            let missing = Module.allCases.filter { !stored.contains($0) }
+            return stored + missing
+        }
+        set {
+            defaults.set(newValue.map(\.rawValue), forKey: orderKey)
+        }
+    }
 }

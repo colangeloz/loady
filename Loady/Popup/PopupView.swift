@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PopupView: View {
     let registry: ModuleRegistry
@@ -41,10 +42,19 @@ struct PopupView: View {
 struct ModuleToggleRow: View {
     let registry: ModuleRegistry
 
+    private let step: CGFloat = 30   // icon width plus HStack spacing
+
+    @State private var dragging: Module?
+    @State private var offset: CGFloat = 0
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(registry.all, id: \.module) { module in
-                ModuleToggle(module: module)
+                ModuleToggle(module: module, isDragging: dragging == module.module)
+                    .offset(x: shift(for: module.module))
+                    .animation(dragging == module.module ? nil : .spring(response: 0.25, dampingFraction: 1.0), value: offset)
+                    .zIndex(dragging == module.module ? 1 : 0)
+                    .gesture(dragOrTap(module))
             }
 
             Spacer()
@@ -66,30 +76,85 @@ struct ModuleToggleRow: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    /// Where the drag would land, clamped to the row.
+    private func destination(from: Int) -> Int {
+        min(max(from + Int((offset / step).rounded()), 0), registry.order.count - 1)
+    }
+
+    /// The dragged icon follows the cursor; everything between its old and new
+    /// slot slides one place to make room.
+    ///
+    /// This is visual only — the real order is committed on release. Reordering
+    /// the ForEach mid-gesture recreates the dragged view, which cancels the
+    /// gesture and snaps it home.
+    private func shift(for module: Module) -> CGFloat {
+        guard let dragging, let from = registry.order.firstIndex(of: dragging) else { return 0 }
+        if module == dragging { return offset }
+
+        guard let index = registry.order.firstIndex(of: module) else { return 0 }
+        let to = destination(from: from)
+
+        if from < to, index > from, index <= to { return -step }
+        if from > to, index < from, index >= to { return step }
+        return 0
+    }
+
+    /// One gesture decides both outcomes.
+    ///
+    /// A Button plus a simultaneous drag means both fire — you reorder *and*
+    /// toggle. With `minimumDistance: 0` this sees the press from the start and
+    /// only commits to a drag once it passes the threshold; anything shorter is
+    /// a click.
+    private func dragOrTap(_ entry: any MetricModule) -> some Gesture {
+        let module = entry.module
+        return DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard dragging != nil || abs(value.translation.width) > 4 else { return }
+                dragging = module
+                offset = value.translation.width
+            }
+            .onEnded { _ in
+                if dragging == module {
+                    if let from = registry.order.firstIndex(of: module) {
+                        let to = destination(from: from)
+                        if to != from { registry.move(module, to: to) }
+                    }
+                } else {
+                    entry.isEnabled.toggle()   // never became a drag
+                }
+                dragging = nil
+                offset = 0
+            }
+    }
 }
 
 private struct ModuleToggle: View {
     @Bindable var module: AnyBindableModule
+    let isDragging: Bool
 
-    init(module: any MetricModule) {
+    init(module: any MetricModule, isDragging: Bool) {
         self.module = AnyBindableModule(module)
+        self.isDragging = isDragging
     }
 
     var body: some View {
-        Button {
-            module.isEnabled.toggle()
-        } label: {
-            Image(systemName: module.symbolName)
-                .font(.system(size: 12, weight: .medium))
-                .frame(width: 26, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(module.isEnabled ? Color.accentColor.opacity(0.18) : .clear)
-                )
-                .foregroundStyle(module.isEnabled ? Color.accentColor : .secondary)
-        }
-        .buttonStyle(.plain)
-        .help(module.displayName)
+        Image(systemName: module.symbolName)
+            .font(.system(size: 12, weight: .medium))
+            .frame(width: 26, height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(module.isEnabled ? Color.accentColor.opacity(0.18) : .clear)
+            )
+            .foregroundStyle(module.isEnabled ? Color.accentColor : .secondary)
+            .contentShape(Rectangle())
+            .help(module.displayName)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(module.displayName)
+        .accessibilityValue(module.isEnabled ? "on" : "off")
+        .scaleEffect(isDragging ? 1.12 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.2 : 0), radius: 4, y: 2)
+        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isDragging)
     }
 }
 
@@ -105,6 +170,8 @@ final class AnyBindableModule {
 
     init(_ wrapped: any MetricModule) { self.wrapped = wrapped }
 
+    var id: Module { wrapped.module }
+    var rawValue: String { wrapped.module.rawValue }
     var symbolName: String { wrapped.module.symbolName }
     var displayName: String { wrapped.module.displayName }
 
@@ -113,3 +180,4 @@ final class AnyBindableModule {
         set { wrapped.isEnabled = newValue }
     }
 }
+

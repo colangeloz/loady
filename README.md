@@ -6,7 +6,10 @@ A macOS menu bar system monitor, written from scratch in Swift 6.
   <img src="Docs/images/loady.gif" alt="Loady in the menu bar, showing CPU and memory">
 </p>
 
-> **Status: early development.** Builds and runs; not yet packaged for install.
+> **Status: early development.** CPU, memory, disk and GPU work; network and
+> sensors are not built yet.
+
+[**Download the latest release**](https://github.com/colangeloz/loady/releases/latest) — signed and notarized, so it opens without a Gatekeeper warning.
 
 Universal binary — Intel and Apple Silicon, macOS 14 and later.
 

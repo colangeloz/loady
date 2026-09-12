@@ -74,7 +74,7 @@ jobs:
             | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
           [ -n "$IDENTITY" ] || { echo "::error::no Developer ID in the imported keychain"; exit 1; }
           echo "DEVELOPER_ID=$IDENTITY" >> "$GITHUB_ENV"
-          echo "signing as: $IDENTITY"
+          echo "imported ${IDENTITY##*\(}"
 
       # Notarization likewise stays as two plain xcrun commands inside
       # make-dmg.sh. Every community action for it wraps those same commands.

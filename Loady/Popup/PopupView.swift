@@ -27,6 +27,9 @@ struct PopupView: View {
         }
         .padding(16)
         .frame(width: 268)
+        // The panel is borderless, so AppKit's focus ring gets drawn as a
+        // square around the whole content instead of following the corners.
+        .focusEffectDisabled()
     }
 }
 

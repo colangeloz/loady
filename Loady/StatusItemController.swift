@@ -25,6 +25,11 @@ final class StatusItemController {
 
     private var refreshTask: Task<Void, Never>?
 
+    // Last values written to AppKit. Each of these costs a layout solve or an
+    // IPC round-trip, so they're only written when they actually change.
+    private var lastLength: CGFloat = -1
+    private var lastSummary = ""
+
     init() {
         registry = ModuleRegistry(profile: profile)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -116,13 +121,21 @@ final class StatusItemController {
             (view as? MenuBarModuleView)?.update(with: module.presentation)
         }
 
-        statusItem.length = stack.fittingSize.width
+        let width = stack.fittingSize.width
+        if width != lastLength {
+            lastLength = width
+            statusItem.length = width
+        }
 
         let summary = registry.enabled
             .compactMap { m in m.presentation.map { "\(m.module.displayName) \($0.text)" } }
             .joined(separator: ", ")
-        statusItem.button?.toolTip = summary
-        statusItem.button?.setAccessibilityLabel(summary.isEmpty ? "Loady" : summary)
+
+        if summary != lastSummary {
+            lastSummary = summary
+            statusItem.button?.toolTip = summary
+            statusItem.button?.setAccessibilityLabel(summary.isEmpty ? "Loady" : summary)
+        }
     }
 
     // MARK: Clicks

@@ -9,6 +9,7 @@ final class MenuBarModuleView: NSView {
     private let iconSize: CGFloat = 15
     private let gap: CGFloat = 3
     private let labelWidth: CGFloat = 30   // fixed: "100%" is the widest case
+    private lazy var labelHeight: CGFloat = { label.sizeToFit(); return label.frame.height }()
 
     init(module: Module, placeholder: Bool = false) {
         super.init(frame: .zero)
@@ -42,16 +43,18 @@ final class MenuBarModuleView: NSView {
         super.layout()
         let height = bounds.height
         iconView.frame = NSRect(x: 0, y: 0, width: iconSize, height: height)
-        label.sizeToFit()
         label.frame = NSRect(
             x: iconSize + gap,
-            y: (height - label.frame.height) / 2,
+            y: (height - labelHeight) / 2,
             width: labelWidth,
-            height: label.frame.height
+            height: labelHeight
         )
     }
 
     func update(with presentation: MenuBarPresentation?) {
-        label.stringValue = presentation?.text ?? "--"
+        let text = presentation?.text ?? "--"
+        guard text != label.stringValue else { return }   // avoid needless invalidation
+        label.stringValue = text
+        needsLayout = true
     }
 }

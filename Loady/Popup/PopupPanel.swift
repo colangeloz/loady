@@ -74,6 +74,12 @@ final class PopupPanel: NSPanel {
         let y = buttonRect.minY - topGap - size.height
 
         setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
+
+        // macOS caches the shadow shape for a borderless transparent window and
+        // does not recompute it on resize. Without this the previous, larger
+        // rectangular shadow is left behind as a hard-edged grey block.
+        invalidateShadow()
+
         orderFrontRegardless()
         startWatchingForDismissal()
     }
@@ -94,6 +100,7 @@ final class PopupPanel: NSPanel {
         let top = frame.maxY
         setContentSize(size)
         setFrameOrigin(NSPoint(x: frame.origin.x, y: top - size.height))
+        invalidateShadow()
     }
 
     // MARK: Click-outside dismissal
@@ -114,9 +121,14 @@ final class PopupPanel: NSPanel {
         dismissMonitor = nil
     }
 
-    // A borderless panel is not key by default, which would stop buttons in it
-    // from responding.
-    override var canBecomeKey: Bool { true }
+    /// Deliberately false.
+    ///
+    /// Clicking a key-capable borderless panel makes it key, and
+    /// `NSGlassEffectView` renders differently for active vs inactive windows —
+    /// which showed up as a grey block behind the content on mouse-down. Mouse
+    /// events still reach a nonactivating panel, so controls keep working; only
+    /// keyboard focus is lost, which a click-away panel doesn't need.
+    override var canBecomeKey: Bool { false }
 
     /// Liquid Glass where the OS has it, the older material everywhere else.
     ///
@@ -131,6 +143,7 @@ final class PopupPanel: NSPanel {
             let glass = NSGlassEffectView()
             glass.style = .regular
             glass.cornerRadius = cornerRadius
+            hosting.translatesAutoresizingMaskIntoConstraints = true
             glass.contentView = hosting
             return glass
         }
@@ -143,6 +156,12 @@ final class PopupPanel: NSPanel {
         effect.layer?.cornerRadius = cornerRadius
         effect.layer?.cornerCurve = .continuous   // squircle, as Apple draws them
         effect.layer?.masksToBounds = true
+
+        hosting.wantsLayer = true
+        hosting.layer?.backgroundColor = .clear
+        hosting.layer?.cornerRadius = cornerRadius
+        hosting.layer?.cornerCurve = .continuous
+        hosting.layer?.masksToBounds = true
 
         effect.addSubview(hosting)
         NSLayoutConstraint.activate([

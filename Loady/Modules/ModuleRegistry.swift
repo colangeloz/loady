@@ -28,6 +28,7 @@ final class ModuleRegistry {
             CPUModule(profile: profile),
             MemoryModule(),
             DiskModule(),
+            GPUModule(),
         ]
         let lookup = Dictionary(uniqueKeysWithValues: modules.map { ($0.module, $0) })
         byID = lookup

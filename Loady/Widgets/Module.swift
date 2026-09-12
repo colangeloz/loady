@@ -35,15 +35,16 @@ enum Module: String, CaseIterable, Sendable {
         }
     }
 
-    /// Verified present on macOS 14+. There is no `gpu` symbol in SF Symbols,
-    /// so the GPU module borrows `display`.
+    /// Verified present on macOS 14+. SF Symbols has no GPU glyph — Apple's own
+    /// keyword index maps "gpu" to `cpu` and `memorychip`, both already taken —
+    /// so the GPU borrows `cube.transparent`.
     var symbolName: String {
         switch self {
         case .cpu:     "cpu"
         case .memory:  "memorychip"
         case .disk:    "internaldrive"
         case .network: "network"
-        case .gpu:     "display"
+        case .gpu:     "cube.transparent"
         case .sensors: "thermometer.medium"
         }
     }

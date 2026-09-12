@@ -17,7 +17,7 @@ enum MenuBarRowImage {
     static let gap: CGFloat = 3
     /// Fixed, so the item never resizes as digits change.
     static let valueWidth: CGFloat = 30
-    static let moduleSpacing: CGFloat = 10
+    static let moduleSpacing: CGFloat = 6
     static let inset: CGFloat = 6
 
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)

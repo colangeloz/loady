@@ -1,17 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// A borderless floating panel used instead of `NSPopover`.
-///
-/// Two reasons `NSPopover` doesn't work here:
-///
-///  1. **The arrow is not optional.** There is no public API to hide it.
-///  2. **It recentres when its content resizes.** Toggling a module changes the
-///     panel's height, and the popover animates itself to a new position —
-///     which reads as the whole panel jumping.
-///
-/// A panel we position ourselves fixes both: no chrome at all, and we anchor
-/// the *top* edge so height changes only ever grow downward.
+/// A borderless panel, not `NSPopover`: the arrow cannot be hidden, and a
+/// popover recentres when its content resizes, so toggling a module made the
+/// whole panel jump. Positioned by hand, anchored to the top edge.
 @MainActor
 final class PopupPanel: NSPanel {
 
@@ -79,9 +71,7 @@ final class PopupPanel: NSPanel {
 
         setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
 
-        // macOS caches the shadow shape for a borderless transparent window and
-        // does not recompute it on resize. Without this the previous, larger
-        // rectangular shadow is left behind as a hard-edged grey block.
+        // The shadow shape is cached and not recomputed on resize.
         invalidateShadow()
 
         orderFrontRegardless()
@@ -103,9 +93,7 @@ final class PopupPanel: NSPanel {
         close()
     }
 
-    /// Re-measures after the content's height changes, keeping the top edge
-    /// where it is. Without this, the panel would clip its own content when a
-    /// module is toggled on.
+    /// Keeps the top edge fixed, so a height change grows downward.
     func resizeKeepingTopEdge() {
         guard isVisible else { return }
         let size = hosting.fittingSize
@@ -121,8 +109,7 @@ final class PopupPanel: NSPanel {
 
     private func startWatchingForDismissal() {
         guard dismissMonitor == nil else { return }
-        // A *global* monitor sees clicks in other applications, which a
-        // borderless panel otherwise has no way to learn about.
+        // A global monitor is the only way to see clicks in other apps.
         dismissMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
@@ -135,20 +122,13 @@ final class PopupPanel: NSPanel {
         dismissMonitor = nil
     }
 
-    /// Deliberately false.
-    ///
-    /// Clicking a key-capable borderless panel makes it key, and
-    /// `NSGlassEffectView` renders differently for active vs inactive windows —
-    /// which showed up as a grey block behind the content on mouse-down. Mouse
-    /// events still reach a nonactivating panel, so controls keep working; only
-    /// keyboard focus is lost, which a click-away panel doesn't need.
+    /// Deliberately false: `NSGlassEffectView` renders differently for active
+    /// windows, which showed as a grey block on mouse-down. Mouse events still
+    /// reach a nonactivating panel.
     override var canBecomeKey: Bool { false }
 
-    /// Liquid Glass where the OS has it, the older material everywhere else.
-    ///
-    /// `NSGlassEffectView` is macOS 26 only. `NSVisualEffectView` is the
-    /// previous generation and genuinely cannot reproduce the Tahoe look —
-    /// which is why the panel looked unlike the system's own popups.
+    /// `NSGlassEffectView` is macOS 26 only; the older material cannot
+    /// reproduce the Tahoe look.
     private static func makeBackground(
         hosting: NSView,
         cornerRadius: CGFloat

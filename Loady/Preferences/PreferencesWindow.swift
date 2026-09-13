@@ -1,13 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Hosts `PreferencesView` in a window this app owns, rather than in SwiftUI's
-/// `Settings` scene.
-///
-/// That scene opens only via `SettingsLink` or the private
-/// `showSettingsWindow:` selector. macOS 26 refuses the selector, and
-/// `SettingsLink` is a View that cannot attach to an `NSMenuItem` — which
-/// would leave right-click → Preferences with no way in.
+/// Not SwiftUI's `Settings` scene: that opens only via `SettingsLink` (a View,
+/// so unusable from an NSMenuItem) or the private `showSettingsWindow:`
+/// selector, which macOS 26 refuses.
 @MainActor
 final class PreferencesWindowController {
 
@@ -17,8 +13,7 @@ final class PreferencesWindowController {
     private init() {}
 
     func show() {
-        // An LSUIElement app is never active; without this the window opens
-        // behind whatever the user was doing.
+        // An LSUIElement app is never active; the window would open behind.
         NSApp.activate(ignoringOtherApps: true)
 
         if let window {
@@ -34,15 +29,10 @@ final class PreferencesWindowController {
         )
         window.title = "Loady Preferences"
         let hosting = NSHostingController(rootView: PreferencesView())
-        // Makes the window track the content as it changes size. Without it the
-        // window is sized once at first layout, so switching to a shorter tab
-        // leaves the old height behind.
+        // Without this the window is sized once, at first layout.
         hosting.sizingOptions = [.preferredContentSize]
         window.contentViewController = hosting
-        // ARC owns it, and it is reused across openings rather than rebuilt.
         window.isReleasedWhenClosed = false
-        // The hosting controller sizes the window from the content, and each
-        // tab reports a different height — so centre after it has done so.
         window.center()
 
         self.window = window

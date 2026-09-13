@@ -10,6 +10,11 @@ struct PopupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // What to show, above what is shown; the actions stay at the
+            // bottom, which is where macOS menus put them.
+            ModuleToggleRow(registry: registry)
+            Divider()
+
             if enabled.isEmpty {
                 Text("No modules enabled")
                     .font(.system(size: 12))
@@ -24,13 +29,56 @@ struct PopupView: View {
             }
 
             Divider()
-            ModuleToggleRow(registry: registry)
+            PopupActions()
         }
         .padding(16)
         .frame(width: 268)
         // The panel is borderless, so AppKit's focus ring gets drawn as a
         // square around the whole content instead of following the corners.
         .focusEffectDisabled()
+    }
+}
+
+/// Preferences, Activity Monitor and Quit.
+///
+/// On their own row rather than sharing one with the module toggles: six
+/// toggles plus three actions needs about 260pt and the popup is 268pt wide
+/// with padding, so they collided — the Spacer between them collapsed and
+/// "Quit" wrapped mid-word.
+private struct PopupActions: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Spacer(minLength: 0)
+
+            if let icon = ActivityMonitor.icon {
+                Button { ActivityMonitor.open() } label: {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .frame(width: 26, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("Open Activity Monitor")
+            }
+
+            Button { PreferencesWindowController.shared.show() } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13))
+                    .frame(width: 26, height: 22)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Preferences")
+
+            Button("Quit") { NSApplication.shared.terminate(nil) }
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                // Never wrap: it is the last thing in the row, so any shortfall
+                // lands here first.
+                .lineLimit(1)
+                .fixedSize()
+        }
     }
 }
 
@@ -57,32 +105,7 @@ struct ModuleToggleRow: View {
                     .gesture(dragOrTap(module))
             }
 
-            Spacer()
-
-            if let icon = ActivityMonitor.icon {
-                Button { ActivityMonitor.open() } label: {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .frame(width: 26, height: 22)
-                }
-                .buttonStyle(.plain)
-                .help("Open Activity Monitor")
-            }
-
-            Button { PreferencesWindowController.shared.show() } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13))
-                    .frame(width: 26, height: 22)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Preferences")
-
-            Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
         }
     }
 

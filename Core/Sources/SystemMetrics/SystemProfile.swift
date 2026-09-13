@@ -1,38 +1,29 @@
 import Darwin
 
-/// An immutable description of the machine this code is running on.
+/// What machine this is, read once at startup.
 ///
-/// Built once at startup and consulted by everything else. This is what
-/// replaces compile-time architecture checks: `#if arch(x86_64)` is *wrong*
-/// here, because the x86_64 slice of a universal binary runs on Apple Silicon
-/// under Rosetta — where it would take the Intel path and report nothing.
-/// Asking the running machine is the only reliable answer.
+/// Replaces `#if arch()`, which is wrong here: the x86_64 slice runs on Apple
+/// Silicon under Rosetta and would take the Intel path.
 public struct SystemProfile: Sendable, Equatable {
 
-    /// Marketing-ish model identifier, e.g. "Mac17,9".
+    /// e.g. "Mac17,9".
     public let modelIdentifier: String
 
-    /// CPU name, e.g. "Apple M5 Pro".
+    /// e.g. "Apple M5 Pro".
     public let cpuBrand: String
 
-    /// True when the *machine* is Apple Silicon, regardless of which slice
-    /// of the binary is executing.
+    /// The *machine*, whichever slice is executing.
     public let isAppleSilicon: Bool
 
-    /// True when this process is an x86_64 binary being translated by Rosetta.
+    /// This process is x86_64 under Rosetta.
     public let isTranslated: Bool
 
-    /// CPU core layout — tiers, counts and index ranges.
     public let cpu: CPULayout
 
-    /// Physical RAM in bytes.
     public let memoryBytes: Int
 
-    /// Virtual-memory page size in bytes.
-    ///
-    /// **16384 on Apple Silicon, 4096 on Intel.** Every memory statistic the
-    /// kernel reports is a page *count*, so hardcoding the Intel value makes
-    /// every number on Apple Silicon four times too small.
+    /// 16384 on Apple Silicon, 4096 on Intel. Kernel memory figures are page
+    /// *counts*, so hardcoding 4096 makes every number 4x too small.
     public let pageSize: Int
 
     public init(
@@ -58,22 +49,17 @@ public struct SystemProfile: Sendable, Equatable {
 
 extension SystemProfile {
 
-    /// Interrogates the kernel and builds a profile of this machine.
-    ///
-    /// Every field has a fallback, because this must not crash on hardware
-    /// nobody has tested — including virtual machines, where several of these
-    /// keys are missing or lie.
+    /// Every field has a fallback: this must not crash on untested hardware,
+    /// including VMs where several of these keys are missing.
     public static func current() -> SystemProfile {
         SystemProfile(
             modelIdentifier: Sysctl.string("hw.model") ?? "unknown",
             cpuBrand: Sysctl.string("machdep.cpu.brand_string") ?? "unknown",
 
-            // The machine is Apple Silicon if this key exists and is 1.
-            // Intel Macs don't have the key at all, so nil means Intel.
+            // Absent on Intel, so nil means Intel.
             isAppleSilicon: Sysctl.flag("hw.optional.arm64") ?? false,
 
-            // 0 = running natively, 1 = translated by Rosetta,
-            // key absent = a genuine Intel Mac.
+            // 0 native, 1 Rosetta, absent = a real Intel Mac.
             isTranslated: Sysctl.flag("sysctl.proc_translated") ?? false,
 
             cpu: readCPULayout(),
@@ -82,7 +68,7 @@ extension SystemProfile {
         )
     }
 
-    /// Reads the CPU tier structure without assuming anything about it.
+    /// Reads the tier structure without assuming a shape.
     ///
     /// The kernel exposes `hw.nperflevels` and then `hw.perflevelN.*` for each.
     /// Intel reports exactly one level named "Standard". An M1 reports two,

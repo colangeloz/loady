@@ -1,14 +1,9 @@
-/// Which driver family a GPU sits behind.
-///
-/// Dispatched on the driver's `IOClass` rather than on the build architecture:
-/// the x86_64 slice runs on Apple Silicon under Rosetta, where `#if arch()`
-/// would pick the Intel path on an M-series Mac.
+/// Dispatched on the driver's `IOClass`, not `#if arch()` — the x86_64 slice
+/// runs on Apple Silicon under Rosetta.
 public enum GPUVendor: String, Sendable {
     case apple, intel, amd, nvidia, unknown
 
-    /// Apple's driver classes are `AGXAccelerator*`, Intel's `IntelAccelerator`,
-    /// AMD's `AMDRadeon*`, NVIDIA's `nvAccelerator`. Matched case-insensitively
-    /// on a prefix, because the suffix changes every hardware generation.
+    /// Prefix-matched: the suffix changes every hardware generation.
     public init(ioClass: String) {
         switch ioClass.lowercased() {
         case let c where c.hasPrefix("agx"):           self = .apple
@@ -20,12 +15,8 @@ public enum GPUVendor: String, Sendable {
     }
 }
 
-/// One GPU's state at a point in time.
-///
-/// Everything past `name` is optional because GPUs genuinely differ in what
-/// they publish — Intel and AMD expose temperature and core clock, Apple
-/// Silicon exposes neither, and a brand new device has no utilization yet.
-/// A missing value is reported as absent, never as a zero.
+/// One GPU's state. Everything past `name` is optional because GPUs differ in
+/// what they publish; absent is never reported as zero.
 public struct GPUDevice: Sendable, Equatable, Identifiable {
     public let id: UInt64
     public let name: String
@@ -76,8 +67,7 @@ public struct GPUSample: Sendable, Equatable {
         self.devices = devices
     }
 
-    /// The busiest device with a reading, which is what a single-line readout
-    /// should show — on a laptop with a discrete GPU the interesting one is
+    /// The busiest device with a reading — on a laptop with a discrete GPU,
     /// whichever is actually working.
     public var primary: GPUDevice? {
         devices.filter { $0.utilization != nil }
@@ -86,23 +76,16 @@ public struct GPUSample: Sendable, Equatable {
     }
 }
 
-/// Percent-to-fraction conversion and smoothing, kept pure and separate
-/// from IOKit.
+/// Percent-to-fraction and smoothing, kept away from IOKit.
 enum GPUMath {
 
-    /// How many samples the rolling mean covers. Three seconds is enough to
-    /// remove the dropouts without the readout lagging noticeably behind a
-    /// change in load.
+    /// Three seconds: enough to remove dropouts without visible lag.
     static let smoothingWindow = 3
 
-    /// A rolling mean over the most recent readings.
-    ///
-    /// `Device Utilization %` counts work the driver submitted, which is
-    /// genuinely zero in seconds where nothing was drawn — measured at 9 of 30
-    /// one-second reads on an idle desktop, swinging 0% to 37% between
-    /// consecutive samples. The underlying mean is sound (16.1% against
-    /// powermetrics' 13-17% over the same period); only the per-sample
-    /// variance is unusable for a readout that updates once a second.
+    /// Rolling mean. `Device Utilization %` counts submitted work, so it is
+    /// genuinely 0 in seconds where nothing was drawn — 9 of 30 reads on an
+    /// idle desktop, swinging 0-37%. The mean is sound (16.1% against
+    /// powermetrics' 13-17%); only the variance is unusable at 1 Hz.
     static func smoothed(_ recent: [Double]) -> Double? {
         guard !recent.isEmpty else { return nil }
         let window = recent.suffix(smoothingWindow)

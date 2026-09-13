@@ -1,44 +1,26 @@
 import Foundation
 
-/// Drives one `MetricReader` on a background executor and publishes its
-/// samples to any number of listeners.
+/// Drives one `MetricReader` off the main thread and publishes its samples.
 ///
-/// This is the single isolation boundary in the app:
-///
-///     IOKit / Mach  →  MetricReader (non-Sendable, owned here)
-///                            │
-///                       actor Sampler
-///                            │  AsyncStream<Sample>   ← Sendable values only
-///     ═══════════════════════╪═══════════════════════
-///                            │
-///                      @MainActor UI
-///
+/// The app's single isolation boundary: a non-Sendable reader lives inside this
+/// actor, and only Sendable samples leave it.
 public actor Sampler<Reader: MetricReader> {
 
     public typealias Sample = Reader.Sample
 
-    /// Built on `start()`, released on `stop()`.
-    ///
-    /// Readers hold kernel resources — `CPUReader` takes a mach port right for
-    /// the lifetime of the instance. Constructing them eagerly means a module
-    /// the user never enables still costs ports, and stopping one never gives
-    /// them back.
+    /// Built on `start()`, released on `stop()` — readers hold kernel
+    /// resources, so a module you never enable should not cost a mach port.
     private let make: @Sendable () -> Reader
     private var reader: Reader?
 
     private var interval: Duration
     private var tickTask: Task<Void, Never>?
 
-    /// One entry per listener. Keyed so a listener can remove itself when its
-    /// stream is torn down, without disturbing the others.
+    /// Keyed so a listener can remove itself without disturbing the others.
     private var listeners: [UUID: AsyncStream<Sample>.Continuation] = [:]
 
-    /// - Parameter make: a factory, not an instance.
-    ///
-    ///   `Reader` is not `Sendable`, so an already-built one could not legally
-    ///   be handed across the boundary into this actor. Passing a `@Sendable`
-    ///   closure instead means the reader is *created here*, on the actor's own
-    ///   executor, and never exists anywhere else.
+    /// A factory, not an instance: `Reader` is not `Sendable`, so the reader
+    /// must be created on this actor rather than handed to it.
     public init(interval: Duration, make: @escaping @Sendable () -> Reader) {
         self.interval = interval
         self.make = make
@@ -48,7 +30,7 @@ public actor Sampler<Reader: MetricReader> {
         tickTask?.cancel()
     }
 
-    /// Begins sampling. Idempotent — calling it twice does nothing.
+    /// Idempotent.
     public func start() {
         guard tickTask == nil else { return }
         if reader == nil { reader = make() }
@@ -71,12 +53,8 @@ public actor Sampler<Reader: MetricReader> {
         self.interval = interval
     }
 
-    /// A new, independent stream of samples.
-    ///
-    /// Buffering is `.bufferingNewest(1)`: if the main thread stalls — a long
-    /// scroll, a beachball elsewhere — the UI resumes with the *freshest*
-    /// reading rather than replaying a backlog of stale ones. For a live
-    /// monitor, old samples have no value.
+    /// `.bufferingNewest(1)`: if the main thread stalls, the UI resumes with
+    /// the freshest reading rather than replaying stale ones.
     public func stream() -> AsyncStream<Sample> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let id = UUID()
@@ -96,21 +74,16 @@ public actor Sampler<Reader: MetricReader> {
         guard let reader else { return }
         let clock = ContinuousClock()
 
-        // Establishes the baseline. Delta-based readers have nothing to say
-        // on their first call, by contract.
-        _ = reader.read()
+        _ = reader.read()   // baseline; delta readers report nothing first time
 
         var deadline = clock.now
 
         while !Task.isCancelled {
             deadline = deadline.advanced(by: interval)
 
-            // Absolute deadlines, never `sleep(for:)`. A relative sleep adds
-            // however long the read took to every interval, so a "1 second"
-            // sampler drifts measurably slow over an hour.
-            //
-            // `tolerance` lets the kernel fire this early to batch our wakeup
-            // with other pending timers. Wakeups, not work, drain batteries.
+            // Absolute deadline, not `sleep(for:)`, which would add the read's
+            // own duration to every interval and drift slow. `tolerance` lets
+            // the kernel batch this wakeup with others.
             try? await clock.sleep(until: deadline, tolerance: interval / 10)
 
             // If the lid was closed for eight hours, `deadline` is now 28,800

@@ -1,13 +1,7 @@
-/// Pure arithmetic turning tick snapshots into percentages.
-///
-/// Deliberately free of any kernel access, so every edge case here can be
-/// tested with hand-written numbers — including ones that are impossible to
-/// reproduce on demand, like a counter wrapping after 49 days of uptime.
+/// Tick snapshots to percentages. No kernel access, so the edge cases —
+/// counter wraparound, zero elapsed — are testable with hand-written numbers.
 public enum CPUMath {
 
-    /// Load for one core between two snapshots.
-    ///
-    /// Returns all-zero when no time passed, rather than dividing by zero.
     public static func load(from before: CoreTicks, to after: CoreTicks) -> CoreLoad {
         let user   = delta(before.user,   after.user)
         let system = delta(before.system, after.system)
@@ -28,15 +22,9 @@ public enum CPUMath {
         )
     }
 
-    /// Difference between two cumulative counters, correct across wraparound.
-    ///
-    /// The kernel's counters are 32-bit and roll over to zero after about
-    /// 49 days of uptime. Plain `after - before` would then be hugely negative
-    /// (or trap, in Swift) and the core would read as pinned at 100% forever.
-    ///
-    /// `&-` is Swift's *wrapping* subtraction: it deliberately allows the
-    /// overflow, which produces exactly the right answer in modular arithmetic.
-    /// 5 &- 4_294_967_290 == 11, which is the true number of elapsed ticks.
+    /// Wrapping subtraction, not `-`. The kernel's 32-bit counters roll over
+    /// after ~49 days of uptime; `-` would trap and the core would read pinned
+    /// at 100%. `5 &- 4_294_967_290 == 11`, the true elapsed ticks.
     static func delta(_ before: UInt32, _ after: UInt32) -> UInt32 {
         after &- before
     }

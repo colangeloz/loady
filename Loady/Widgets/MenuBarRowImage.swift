@@ -1,16 +1,10 @@
 import AppKit
 
-/// Renders the whole menu bar row — every enabled module's icon and readout —
-/// into a single template image.
+/// The whole menu bar row as one template image.
 ///
-/// Why an image rather than a view hierarchy: `NSStatusItem` keeps "replicant"
-/// copies of its item, and refreshes them by snapshotting the button's view
-/// tree with `cacheDisplayInRect:toBitmapImageRep:`. With custom subviews that
-/// snapshot re-runs layout and draws every `NSTextField` through the full cell
-/// machinery — bezel configuration, text tightening, appearance resolution —
-/// and it re-arms itself, measured at ~480 passes a second for a value that
-/// changes once a second. Handing AppKit a finished image collapses that to a
-/// single blit, the same path a plain `title` takes.
+/// Not subviews: NSStatusItem refreshes its replicant copies by snapshotting
+/// the button's view tree, and on Tahoe that re-arms itself — measured at ~480
+/// layout and draw passes a second, ~36% of a core. An image is one blit.
 enum MenuBarRowImage {
 
     static let iconSize: CGFloat = 15
@@ -37,13 +31,8 @@ enum MenuBarRowImage {
             + CGFloat(moduleCount - 1) * moduleSpacing
     }
 
-    /// - Parameters:
-    ///   - entries: icon and readout per module, in display order. A `nil` text
-    ///     draws the icon alone.
-    ///   - dimmed: draws icons at half opacity. Used for the placeholder shown
-    ///     when nothing is enabled, so it reads as a handle back to the popup
-    ///     rather than as a metric — not for compact mode, which is a normal
-    ///     state and should look like any other menu bar item.
+    /// A `nil` text draws the icon alone. `dimmed` is for the placeholder
+    /// shown when nothing is enabled, not for compact mode.
     static func make(entries: [(icon: NSImage?, text: String?)],
                      height: CGFloat,
                      dimmed: Bool = false) -> NSImage {
@@ -76,8 +65,7 @@ enum MenuBarRowImage {
             return true
         }
 
-        // Template, so the menu bar tints it for whatever is behind it — the
-        // reason every colour above is drawn as opaque black.
+        // Template: the menu bar tints it, hence the opaque black above.
         image.isTemplate = true
         return image
     }

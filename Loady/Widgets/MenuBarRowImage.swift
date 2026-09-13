@@ -22,6 +22,13 @@ enum MenuBarRowImage {
 
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
 
+    static func compact(height: CGFloat) -> NSImage {
+        make(entries: [(icon: appIcon, text: nil)], height: height)
+    }
+
+    private static let appIcon: NSImage? =
+        LoadyGlyph.image(size: NSSize(width: 17, height: 11))
+
     static func width(moduleCount: Int, hasValues: Bool) -> CGFloat {
         guard moduleCount > 0 else { return inset * 2 }
         let each = hasValues ? iconSize + gap + valueWidth : iconSize
@@ -30,9 +37,16 @@ enum MenuBarRowImage {
             + CGFloat(moduleCount - 1) * moduleSpacing
     }
 
-    /// - Parameter entries: icon and readout per module, in display order.
-    ///   A `nil` text draws the icon alone, used for the placeholder item.
-    static func make(entries: [(icon: NSImage?, text: String?)], height: CGFloat) -> NSImage {
+    /// - Parameters:
+    ///   - entries: icon and readout per module, in display order. A `nil` text
+    ///     draws the icon alone.
+    ///   - dimmed: draws icons at half opacity. Used for the placeholder shown
+    ///     when nothing is enabled, so it reads as a handle back to the popup
+    ///     rather than as a metric — not for compact mode, which is a normal
+    ///     state and should look like any other menu bar item.
+    static func make(entries: [(icon: NSImage?, text: String?)],
+                     height: CGFloat,
+                     dimmed: Bool = false) -> NSImage {
         let hasValues = entries.contains { $0.text != nil }
         let size = NSSize(width: width(moduleCount: max(entries.count, 1), hasValues: hasValues),
                           height: height)
@@ -43,11 +57,8 @@ enum MenuBarRowImage {
                 if let icon = entry.icon {
                     let box = NSRect(x: x, y: (height - iconSize) / 2,
                                      width: iconSize, height: iconSize)
-                    // The icon-only placeholder is dimmed, to read as a handle
-                    // back to the popup rather than as a metric.
                     icon.draw(in: box.fitting(icon.size), from: .zero,
-                              operation: .sourceOver,
-                              fraction: entry.text == nil ? 0.5 : 1)
+                              operation: .sourceOver, fraction: dimmed ? 0.5 : 1)
                 }
                 guard let text = entry.text else {
                     x += iconSize + moduleSpacing

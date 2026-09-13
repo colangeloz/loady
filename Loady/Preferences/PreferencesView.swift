@@ -31,6 +31,11 @@ private struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Show values in the menu bar", isOn: Binding(
+                    get: { Preferences.shared.menuBarShowsValues },
+                    set: { Preferences.shared.menuBarShowsValues = $0 }
+                ))
+
                 Toggle("Launch at login", isOn: Binding(
                     get: { launchAtLogin.isEnabled },
                     set: { launchAtLogin.set($0) }

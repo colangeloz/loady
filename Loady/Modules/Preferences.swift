@@ -36,6 +36,11 @@ final class Preferences {
         defaults.set(enabled, forKey: key(for: module))
     }
 
+    var menuBarShowsValues: Bool {
+        get { defaults.object(forKey: "menubar.showValues") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "menubar.showValues") }
+    }
+
     /// Off by default, deliberately: the app makes no network connections
     /// until someone asks it to.
     var checkForUpdatesOnLaunch: Bool {

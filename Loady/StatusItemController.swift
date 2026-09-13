@@ -22,6 +22,7 @@ final class StatusItemController {
     /// empty, because "no modules enabled" is a real state that still needs a
     /// first build — of the placeholder.
     private var laidOutModules: [Module]?
+    private var laidOutShowingValues = true
 
     /// Icons are stable for the life of a layout, so they're resolved once per
     /// rebuild rather than once per tick.
@@ -78,9 +79,22 @@ final class StatusItemController {
     /// tick: icons are stable for a given layout, and looking up six SF Symbols
     /// a second to draw the same glyphs would be wasted work.
     private func rebuildIfNeeded() {
+        let showValues = Preferences.shared.menuBarShowsValues
         let current = registry.enabled.map(\.module)
-        guard current != laidOutModules else { return }
+        guard current != laidOutModules || showValues != laidOutShowingValues else { return }
         laidOutModules = current
+        laidOutShowingValues = showValues
+
+        if !showValues {
+            let image = MenuBarRowImage.compact(height: NSStatusBar.system.thickness)
+            statusItem.button?.image = image
+            statusItem.length = image.size.width
+            lastLength = image.size.width
+            lastTexts = []
+            icons = []
+            panel?.resizeKeepingTopEdge()
+            return
+        }
         registry.sync()
 
         // Only if it's actually on screen — never create one to resize it.
@@ -141,6 +155,11 @@ final class StatusItemController {
     }
 
     private func refresh() {
+        guard Preferences.shared.menuBarShowsValues else {
+            updateSummary()
+            return
+        }
+
         // nil text means "icon only", used for the placeholder item.
         let texts: [String?] = registry.enabled.isEmpty
             ? [nil]
@@ -152,7 +171,8 @@ final class StatusItemController {
             lastTexts = texts
             let height = NSStatusBar.system.thickness
             let entries = Array(zip(icons, texts)).map { (icon: $0.0, text: $0.1) }
-            let image = MenuBarRowImage.make(entries: entries, height: height)
+            let image = MenuBarRowImage.make(entries: entries, height: height,
+                                             dimmed: registry.enabled.isEmpty)
             statusItem.button?.image = image
 
             if image.size.width != lastLength {
@@ -161,15 +181,18 @@ final class StatusItemController {
             }
         }
 
+        updateSummary()
+    }
+
+    private func updateSummary() {
         let summary = registry.enabled
             .compactMap { m in m.presentation.map { "\(m.module.displayName) \($0.text)" } }
             .joined(separator: ", ")
 
-        if summary != lastSummary {
-            lastSummary = summary
-            statusItem.button?.toolTip = summary
-            statusItem.button?.setAccessibilityLabel(summary.isEmpty ? "Loady" : summary)
-        }
+        guard summary != lastSummary else { return }
+        lastSummary = summary
+        statusItem.button?.toolTip = summary
+        statusItem.button?.setAccessibilityLabel(summary.isEmpty ? "Loady" : summary)
     }
 
     // MARK: Clicks

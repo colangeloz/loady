@@ -33,7 +33,12 @@ final class PreferencesWindowController {
             defer: false
         )
         window.title = "Loady Preferences"
-        window.contentViewController = NSHostingController(rootView: PreferencesView())
+        let hosting = NSHostingController(rootView: PreferencesView())
+        // Makes the window track the content as it changes size. Without it the
+        // window is sized once at first layout, so switching to a shorter tab
+        // leaves the old height behind.
+        hosting.sizingOptions = [.preferredContentSize]
+        window.contentViewController = hosting
         // ARC owns it, and it is reused across openings rather than rebuilt.
         window.isReleasedWhenClosed = false
         // The hosting controller sizes the window from the content, and each

@@ -82,6 +82,10 @@ private struct AboutTab: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 320)
+                // Without this the text truncates rather than wrapping: the
+                // frame above constrains the width, and nothing tells SwiftUI
+                // the text may take as much height as it needs.
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack {
                 Link("GitHub", destination: URL(string: "https://github.com/colangeloz/loady")!)
@@ -90,7 +94,7 @@ private struct AboutTab: View {
             .font(.callout)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
     }
 }
 

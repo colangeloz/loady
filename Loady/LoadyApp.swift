@@ -10,10 +10,14 @@ struct LoadyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        // Every SwiftUI App must declare at least one Scene, but this app has
-        // no window at launch. `Settings` contributes the ⌘, window and nothing
-        // else — it stays closed until asked for. That makes it the
-        // conventional choice for menu bar apps, and we'll fill it in later.
+        // Every SwiftUI App must declare at least one Scene, and this app has
+        // no window at launch. `Settings` is the conventional placeholder: it
+        // contributes nothing visible on its own.
+        //
+        // Preferences deliberately does NOT live here. The Settings scene can
+        // only be opened by `SettingsLink` or the private `showSettingsWindow:`
+        // selector, and the selector no longer works — which would leave the
+        // right-click menu with no way in. See `PreferencesWindowController`.
         Settings {
             EmptyView()
         }

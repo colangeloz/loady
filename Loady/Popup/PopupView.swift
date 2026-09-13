@@ -70,6 +70,15 @@ struct ModuleToggleRow: View {
                 .help("Open Activity Monitor")
             }
 
+            Button { PreferencesWindowController.shared.show() } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13))
+                    .frame(width: 26, height: 22)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Preferences")
+
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .font(.system(size: 11))

@@ -157,6 +157,10 @@ final class StatusItemController {
 
     private func showContextMenu() {
         let menu = NSMenu()
+        menu.addItem(withTitle: "Preferences…",
+                     action: #selector(openPreferences),
+                     keyEquivalent: ",").target = self
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Loady",
                      action: #selector(NSApplication.terminate(_:)),
                      keyEquivalent: "q")
@@ -166,6 +170,10 @@ final class StatusItemController {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    @objc private func openPreferences() {
+        PreferencesWindowController.shared.show()
     }
 
     private func togglePopover() {

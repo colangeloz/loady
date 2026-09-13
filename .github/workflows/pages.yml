@@ -1,0 +1,43 @@
+name: pages
+
+# Publishes site/ to loady.colangelo.me.
+#
+# This is GitHub's "Static HTML" starter workflow with two changes: it uploads
+# `site` rather than `'.'` (which would publish the entire repository, sources
+# and all), and it only runs when the site actually changes.
+#
+# Deployed by workflow rather than by pointing Pages at a folder, because the
+# built-in folder option only accepts the repository root or a literal `docs/` —
+# and this repo already has `Docs/` for project documentation. Git is case
+# sensitive and macOS is not, so the two would collide on a checkout.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; a queued one supersedes, but an in-flight one
+# is allowed to finish rather than leaving the site half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5

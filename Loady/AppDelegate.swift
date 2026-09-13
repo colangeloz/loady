@@ -10,6 +10,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Xcode hosts SwiftUI previews by launching the app, so `@main` runs
         // and every canvas refresh would add another menu bar item.
         guard !ProcessInfo.processInfo.isRunningInXcodePreview else { return }
+
+        // Same reasoning, different cause: launching the installed app while
+        // it is already running would add a second, identical menu bar item.
+        if SingleInstance.yieldToExistingInstance() {
+            NSApp.terminate(nil)
+            return
+        }
+
         statusItem = StatusItemController()
     }
 

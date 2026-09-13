@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         statusItem = StatusItemController()
+
+        // Only if the user asked for it; see UpdateChecker.
+        Task { await UpdateChecker.shared.checkIfEnabled() }
     }
 
     // The app has no windows, so there is no "last window closed" moment.

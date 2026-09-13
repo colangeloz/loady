@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loady — a macOS menu bar system monitor</title>
-<meta name="description" content="CPU, memory, disk and GPU in your macOS menu bar. Open source, notarized, makes no network connections.">
+<meta name="description" content="CPU, memory, disk and GPU in your macOS menu bar. Open source, notarized, and silent on the network unless you ask it to check for updates.">
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Loady">
 <meta property="og:description" content="A macOS menu bar system monitor, written from scratch in Swift 6.">
@@ -84,8 +84,9 @@
 
   <h2>Why you might trust it</h2>
   <ul class="plain">
-    <li><b><span class="dot"></span> Makes no network connections.</b>
-        <span>— no telemetry, no update pings, nothing to opt out of.</span></li>
+    <li><b><span class="dot"></span> Silent on the network by default.</b>
+        <span>— no telemetry, no analytics, no phoning home. The one exception is
+        checking GitHub for a new version, which is off until you switch it on.</span></li>
     <li><b>Signed and notarized by Apple.</b>
         <span>— opens without a Gatekeeper warning.</span></li>
     <li><b>Around half a percent of one core.</b>

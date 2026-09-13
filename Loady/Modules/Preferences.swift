@@ -36,6 +36,13 @@ final class Preferences {
         defaults.set(enabled, forKey: key(for: module))
     }
 
+    /// Off by default, deliberately: the app makes no network connections
+    /// until someone asks it to.
+    var checkForUpdatesOnLaunch: Bool {
+        get { defaults.bool(forKey: "updates.checkOnLaunch") }
+        set { defaults.set(newValue, forKey: "updates.checkOnLaunch") }
+    }
+
     private let orderKey = "module.order"
 
     /// Display order. Modules added in a later version won't be in a stored

@@ -16,6 +16,8 @@ struct PreferencesView: View {
         TabView {
             GeneralTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            UpdatesTab()
+                .tabItem { Label("Updates", systemImage: "arrow.trianglehead.2.clockwise") }
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -57,6 +59,48 @@ private struct GeneralTab: View {
         .fixedSize(horizontal: false, vertical: true)
         // The user can revoke this in System Settings without telling the app.
         .onAppear { launchAtLogin.refresh() }
+    }
+}
+
+private struct UpdatesTab: View {
+    @State private var updates = UpdateChecker.shared
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Current version") {
+                    Text(updates.currentVersion).monospacedDigit()
+                }
+                Toggle("Check on launch", isOn: $updates.checkOnLaunch)
+                HStack {
+                    Button("Check Now") {
+                        Task { await updates.check() }
+                    }
+                    .disabled(updates.state == .checking)
+
+                    switch updates.state {
+                    case .idle:
+                        EmptyView()
+                    case .checking:
+                        ProgressView().controlSize(.small)
+                    case .upToDate:
+                        Text("Up to date.").foregroundStyle(.secondary)
+                    case let .available(version, url):
+                        Link("\(version) is available", destination: url)
+                    case let .failed(reason):
+                        Text(reason).foregroundStyle(.red).lineLimit(2)
+                    }
+                }
+            } footer: {
+                Text("This is the only part of Loady that uses the network, and "
+                     + "it asks GitHub for the latest release number and nothing else. "
+                     + "Off unless you turn it on.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

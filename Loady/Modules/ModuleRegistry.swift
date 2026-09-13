@@ -55,6 +55,12 @@ final class ModuleRegistry {
             if module.isEnabled { module.start() } else { module.stop() }
         }
     }
+
+    /// Stops every module regardless of whether it is enabled. `sync()` puts
+    /// the enabled ones back.
+    func stopAll() {
+        for module in all { module.stop() }
+    }
 }
 
 #if DEBUG

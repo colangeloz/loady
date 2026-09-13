@@ -28,6 +28,7 @@ final class StatusItemController {
     private var icons: [NSImage?] = []
 
     private var refreshTask: Task<Void, Never>?
+    private var sleepWatcher: SleepWatcher?
 
     // Last values written to AppKit. Each costs an IPC round-trip, so they're
     // only written when they actually change.
@@ -43,6 +44,7 @@ final class StatusItemController {
         configureButton()
         registry.sync()
         startRefreshing()
+        watchForSleep()
     }
 
     deinit {
@@ -93,7 +95,28 @@ final class StatusItemController {
         lastTexts = []   // force the next refresh to redraw
     }
 
+    private func watchForSleep() {
+        sleepWatcher = SleepWatcher(
+            onSleep: { [weak self] in
+                guard let self else { return }
+                refreshTask?.cancel()
+                refreshTask = nil
+                registry.stopAll()
+            },
+            onWake: { [weak self] in
+                guard let self else { return }
+                // Readers are rebuilt by `start()`, so their baselines are
+                // established fresh rather than carrying a pre-sleep snapshot
+                // that would make the first delta cover the whole sleep.
+                registry.sync()
+                startRefreshing()
+            }
+        )
+    }
+
     private func startRefreshing() {
+        guard refreshTask == nil else { return }
+
         // Display refresh is deliberately separate from sampling. Modules tick
         // at their own rates (CPU 1s, memory 2s); this just reads whatever
         // each currently has and paints it.
@@ -106,6 +129,10 @@ final class StatusItemController {
                 try? await clock.sleep(until: deadline, tolerance: .milliseconds(100))
                 if clock.now - deadline > .seconds(4) { deadline = clock.now }
 
+                // `try?` swallows the CancellationError that ends the sleep, so
+                // without this the loop paints one more frame after being told
+                // to stop — once per sleep, with the Mac already asleep.
+                if Task.isCancelled { return }
                 guard let self else { return }
                 self.rebuildIfNeeded()
                 self.refresh()

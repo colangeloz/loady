@@ -18,7 +18,7 @@ NAME="Loady"
 VERSION="${VERSION:-0.1.0}"
 BUILD_DIR="${BUILD_DIR:-.build/release}"
 STAGE="$BUILD_DIR/dmg"
-DMG="$BUILD_DIR/$NAME-$VERSION.dmg"
+DMG="$BUILD_DIR/$NAME.dmg"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$STAGE"

@@ -23,7 +23,7 @@ jobs:
           - { runner: macos-26,       arch: arm64 }
           - { runner: macos-26-intel, arch: x86_64 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain
         run: swift --version && sw_vers
       - name: Build
@@ -36,7 +36,7 @@ jobs:
     name: app
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         run: |
           set -o pipefail
@@ -79,7 +79,7 @@ jobs:
           - { runner: macos-26,       arch: arm64 }
           - { runner: macos-26-intel, arch: x86_64 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Machine profile
         run: |
           {
@@ -101,7 +101,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Run the probe
         run: swift run --package-path Core loady-probe 2>/dev/null | tee probe-${{ matrix.arch }}.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: probe-${{ matrix.arch }}
           path: probe-${{ matrix.arch }}.txt

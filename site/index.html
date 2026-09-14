@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loady — a macOS menu bar system monitor</title>
-<meta name="description" content="CPU, memory, disk and GPU in your macOS menu bar. Open source, notarized, and silent on the network unless you ask it to check for updates.">
+<meta name="description" content="CPU, memory, disk, network and GPU in your macOS menu bar. Open source, notarized, and silent on the network unless you ask it to check for updates.">
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Loady">
 <meta property="og:description" content="A macOS menu bar system monitor, written from scratch in Swift 6.">
@@ -80,6 +80,7 @@
     <div class="card"><h3>Memory</h3><p>App, wired and compressed, reconciled with Activity Monitor.</p></div>
     <div class="card"><h3>Disk</h3><p>Capacity and throughput, with APFS containers counted once.</p></div>
     <div class="card"><h3>GPU</h3><p>Utilization and memory in use, per device.</p></div>
+    <div class="card"><h3>Network</h3><p>Throughput up and down, from 64-bit interface counters that do not wrap.</p></div>
   </div>
 
   <h2>Why you might trust it</h2>
@@ -88,7 +89,8 @@
         <span>— no telemetry, no analytics, no phoning home. The one exception is
         checking GitHub for a new version, which is off until you switch it on.</span></li>
     <li><b>Signed and notarized by Apple.</b>
-        <span>— opens without a Gatekeeper warning.</span></li>
+        <span>— opens without a Gatekeeper warning, and updates itself once you
+        switch that on.</span></li>
     <li><b>Around half a percent of one core.</b>
         <span>— a system monitor should not be what's using your system.</span></li>
     <li><b>Every number is cross-checked.</b>

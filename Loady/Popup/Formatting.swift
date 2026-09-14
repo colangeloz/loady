@@ -24,15 +24,26 @@ enum Format {
     static func rateCompact(_ bytesPerSecond: Double) -> String {
         let value = max(0, bytesPerSecond)
         switch value {
-        case ..<1_000:          return "0"
+        // Always a unit, never a bare "0" — in the slot where every other
+        // module shows a percentage, that reads as broken rather than idle.
+        case ..<1_000:          return "0K"
         case ..<1_000_000:      return "\(Int(value / 1_000))K"
         case ..<10_000_000:     return String(format: "%.1fM", value / 1_000_000)
         default:                return "\(Int(value / 1_000_000))M"
         }
     }
 
-    /// Throughput with room to spell it out, for the popup.
+    /// Throughput for the popup.
+    ///
+    /// Not `bytes()`: that is restricted to GB and MB so capacities read
+    /// consistently, which rounds every ordinary network speed to "0 MB/s".
     static func rate(_ bytesPerSecond: Double) -> String {
-        "\(bytes(Int(max(0, bytesPerSecond))))/s"
+        let value = max(0, bytesPerSecond)
+        switch value {
+        case ..<1_000:          return "\(Int(value)) B/s"
+        case ..<1_000_000:      return String(format: "%.0f KB/s", value / 1_000)
+        case ..<1_000_000_000:  return String(format: "%.1f MB/s", value / 1_000_000)
+        default:                return String(format: "%.2f GB/s", value / 1_000_000_000)
+        }
     }
 }

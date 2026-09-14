@@ -14,10 +14,10 @@ A macOS menu bar system monitor, written from scratch in Swift 6.
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
 
-> **Status: early development.** CPU, memory, disk and GPU work; network and
+> **Status: early development.** CPU, memory, disk, network and GPU work;
 > sensors are not built yet.
 
-[**Download the latest release**](https://github.com/colangeloz/loady/releases/latest) — signed and notarized, so it opens without a Gatekeeper warning.
+[**Download the latest release**](https://github.com/colangeloz/loady/releases/latest) — signed and notarized, so it opens without a Gatekeeper warning. It can update itself from then on, if you switch that on.
 
 Universal binary — Intel and Apple Silicon, macOS 14 and later.
 
@@ -29,6 +29,7 @@ Universal binary — Intel and Apple Silicon, macOS 14 and later.
 | CPU topology | `hw.nperflevels`, `hw.perflevelN.*` | `system_profiler` |
 | Memory used / wired / compressed | `host_statistics64(HOST_VM_INFO64)` | `vm_stat`, Activity Monitor |
 | Pressure and swap | `kern.memorystatus_vm_pressure_level`, `vm.swapusage` | `memory_pressure` |
+| Network throughput and totals | `sysctl(NET_RT_IFLIST2)` → `if_data64` | `netstat -ibn` |
 
 Core tiers are read from the kernel rather than assumed: an M5 Pro reports
 `Super` and `Performance` with no efficiency tier at all.

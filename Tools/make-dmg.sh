@@ -34,8 +34,10 @@ else
   SIGN_ARGS=(CODE_SIGNING_ALLOWED=NO)
 fi
 
-# Without this the bundle reports 1.0 forever, whatever the DMG is called.
-SIGN_ARGS+=(MARKETING_VERSION="$VERSION")
+# Both, from the tag. MARKETING_VERSION is what people see; CURRENT_PROJECT_VERSION
+# is CFBundleVersion, which is the field Sparkle compares — left at its default
+# of 1 it never changes and no update is ever offered.
+SIGN_ARGS+=(MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION")
 
 NOTARY_ARGS=()
 if [ -n "${NOTARY_PROFILE:-}" ]; then
@@ -54,6 +56,29 @@ xcodebuild archive \
   >/dev/null
 
 APP="$BUILD_DIR/$NAME.xcarchive/Products/Applications/$NAME.app"
+ZIP="$BUILD_DIR/$NAME-$VERSION.zip"
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+
+# Sparkle ships every helper ad-hoc signed, and `xcodebuild archive` does not
+# re-sign them — verified: Autoupdate came out flags=0x10002(adhoc,runtime),
+# TeamIdentifier=not set, from an archive signed with a real Developer ID.
+# Notarization rejects that. No --deep: the docs warn against it, and each
+# nested item is signed individually below, app last since it seals the rest.
+if [ -n "${DEVELOPER_ID:-}" ] && [ -d "$SPARKLE" ]; then
+  echo "▸ re-signing Sparkle helpers"
+  for helper in \
+      "XPCServices/Installer.xpc" \
+      "XPCServices/Downloader.xpc" \
+      "Autoupdate" \
+      "Updater.app"; do
+    [ -e "$SPARKLE/$helper" ] || continue
+    codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp \
+      --preserve-metadata=entitlements "$SPARKLE/$helper"
+  done
+  codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp \
+    "$APP/Contents/Frameworks/Sparkle.framework"
+  codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp "$APP"
+fi
 
 echo "▸ verifying the app binary"
 lipo -archs "$APP/Contents/MacOS/$NAME" | sed 's/^/  archs: /'
@@ -79,8 +104,23 @@ LSUI="$(/usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP/Contents/Info.plis
 ENT_COUNT=$(grep -c '<key>' <<<"$ENTS" 2>/dev/null) || true
 echo "  entitlements: ${ENT_COUNT:-0} · LSUIElement: true · no sandbox"
 
+# `codesign --verify --deep --strict` passes on an app whose nested helpers are
+# ad-hoc — verified. So check for it explicitly; otherwise the only thing that
+# catches it is notarization, as an opaque rejection.
+# `|| true`: the inner `grep -q … && echo` returns 1 when nothing matches, and
+# `set -e` would treat "found no problems" as a failure.
+ADHOC=$(find "$APP/Contents/Frameworks" "$APP/Contents/MacOS" -type f -perm +111 2>/dev/null \
+        | while read -r bin; do
+            if codesign -dvv "$bin" 2>&1 | grep -q "Signature=adhoc"; then echo "$bin"; fi
+          done || true)
+if [ -n "${DEVELOPER_ID:-}" ] && [ -n "$ADHOC" ]; then
+  echo "  ERROR: ad-hoc signed binaries remain:"
+  echo "$ADHOC" | sed 's|.*/Contents/|    …/Contents/|'
+  exit 1
+fi
+
 if [ -n "${DEVELOPER_ID:-}" ]; then
-  codesign --verify --strict --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
+  codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
   SIG="$(codesign -dvv "$APP" 2>&1 || true)"
   grep -E "^(Authority|TeamIdentifier|Timestamp)" <<<"$SIG" | sed 's/^/  /'
   # Required for notarization: a binary without it is rejected at submission,
@@ -88,6 +128,22 @@ if [ -n "${DEVELOPER_ID:-}" ]; then
   grep -q "flags=.*runtime" <<<"$SIG" \
     || { echo "  ERROR: hardened runtime not enabled"; exit 1; }
 fi
+
+if [ ${#NOTARY_ARGS[@]} -gt 0 ]; then
+  # The app is notarized and stapled *before* either artifact is built, so the
+  # copy Sparkle installs carries its own ticket and launches offline. Stapling
+  # only the DMG leaves the app inside it unstapled.
+  echo "▸ notarizing the app"
+  ditto -c -k --sequesterRsrc --keepParent "$APP" "$BUILD_DIR/notarize.zip"
+  xcrun notarytool submit "$BUILD_DIR/notarize.zip" "${NOTARY_ARGS[@]}" --wait
+  xcrun stapler staple "$APP"
+  rm -f "$BUILD_DIR/notarize.zip"
+fi
+
+# ditto, not zip: frameworks are full of symlinks and a tool that follows them
+# breaks the signature. --keepParent keeps the .app wrapper.
+echo "▸ building update archive"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
 cp -R "$APP" "$STAGE/"
 
@@ -122,8 +178,42 @@ if [ ${#NOTARY_ARGS[@]} -gt 0 ]; then
 
   echo "▸ Gatekeeper check"
   spctl -a -t open --context context:primary-signature -v "$DMG" 2>&1 | sed 's/^/  /'
+
+  # The zip is what Sparkle actually installs, so prove it separately.
+  VERIFY_DIR=$(mktemp -d)
+  ditto -x -k "$ZIP" "$VERIFY_DIR"
+  xcrun stapler validate "$VERIFY_DIR/$NAME.app" | sed 's/^/  /'
+  spctl -a -t exec -vv "$VERIFY_DIR/$NAME.app" 2>&1 | sed 's/^/  /'
+  rm -rf "$VERIFY_DIR"
 fi
 
+# Sparkle verifies this signature against SUPublicEDKey before installing, so
+# a compromised host still cannot ship an update.
+SIGN_UPDATE="${SIGN_UPDATE:-$(find ~/Library/Developer/Xcode/DerivedData \
+    -path "*/artifacts/sparkle/Sparkle/bin/sign_update" 2>/dev/null | head -1 || true)}"
+if [ -n "${SIGN_UPDATE:-}" ]; then
+  if [ -x "$SIGN_UPDATE" ]; then
+    echo "▸ signing the update archive"
+    if [ -n "${SPARKLE_PRIVATE_KEY:-}" ]; then
+      # CI has no keychain; --ed-key-file - reads the key from stdin.
+      SIG=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$ZIP")
+    else
+      SIG=$("$SIGN_UPDATE" "$ZIP")
+    fi
+    echo "  $SIG"
+    printf '%s\n' "$SIG" > "$BUILD_DIR/appcast-fragment.txt"
+  else
+    echo "  WARNING: sign_update not found; update archive is unsigned"
+  fi
+fi
+
+# So CI does not have to rebuild these paths from the version string.
+if [ -n "${GITHUB_ENV:-}" ]; then
+  { echo "DMG_PATH=$DMG"; echo "ZIP_PATH=$ZIP"; } >> "$GITHUB_ENV"
+fi
+
+echo "▸ $ZIP"
+ls -lh "$ZIP" | awk '{print "  " $5}'
 echo "▸ $DMG"
 ls -lh "$DMG" | awk '{print "  " $5}'
 

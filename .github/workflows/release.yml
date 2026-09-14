@@ -13,7 +13,9 @@ on:
         required: true
 
 permissions:
-  contents: write        # to create the Release and upload the DMG
+  contents: write        # create the Release, upload artifacts, push the appcast
+  pages: write           # deploy the appcast — see "Publish the appcast" below
+  id-token: write
 
 jobs:
   release:
@@ -78,11 +80,23 @@ jobs:
 
       # Notarization likewise stays as two plain xcrun commands inside
       # make-dmg.sh. Every community action for it wraps those same commands.
+      # Downloaded rather than dug out of DerivedData: the SPM artifacts path
+      # changes between Xcode versions, and this pins the tool to the same
+      # version the app links.
+      - name: Fetch Sparkle tools
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/sparkle.zip" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-for-Swift-Package-Manager.zip"
+          unzip -q "$RUNNER_TEMP/sparkle.zip" -d "$RUNNER_TEMP/sparkle"
+          echo "SIGN_UPDATE=$RUNNER_TEMP/sparkle/bin/sign_update" >> "$GITHUB_ENV"
+
       - name: Build, sign, notarize and staple
         env:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
           NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
@@ -92,23 +106,38 @@ jobs:
           trap 'rm -f "$NOTARY_KEY"' EXIT
           ./Tools/make-dmg.sh
 
-      # Proves the artifact is distributable, rather than trusting that the
-      # steps above succeeded. Gatekeeper is the only opinion that counts.
-      - name: Verify Gatekeeper accepts the result
-        run: |
-          set -euo pipefail
-          DMG=".build/release/Loady-${{ steps.version.outputs.version }}.dmg"
-          xcrun stapler validate "$DMG"
-          spctl -a -t open --context context:primary-signature -v "$DMG"
-
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.version.outputs.tag }}" \
-            ".build/release/Loady-${{ steps.version.outputs.version }}.dmg" \
+            "$DMG_PATH" "$ZIP_PATH" \
             --title "${{ steps.version.outputs.tag }}" \
             --generate-notes
+
+      # After the release exists: the enclosure URL 404s until the asset is up.
+      - name: Update the appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          FRAGMENT=".build/release/appcast-fragment.txt"
+          [ -s "$FRAGMENT" ] || { echo "::error::no signature from make-dmg.sh"; exit 1; }
+          SIG=$(sed -E 's/.*edSignature="([^"]+)".*/\1/' "$FRAGMENT")
+          LEN=$(sed -E 's/.*length="([0-9]+)".*/\1/' "$FRAGMENT")
+
+          gh release view "${{ steps.version.outputs.tag }}" --json body -q .body \
+            > "$RUNNER_TEMP/notes.md" || true
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          ./Tools/update-appcast.sh "$V" "$(basename "$ZIP_PATH")" "$SIG" "$LEN" "$RUNNER_TEMP/notes.md"
+          git add site/appcast.xml
+          git commit -m "chore: add v$V to the appcast" || { echo "nothing to commit"; exit 0; }
+          git push origin main
 
       # Runs even when an earlier step failed: a signing key must never outlive
       # the job, however the job ended.
@@ -117,3 +146,27 @@ jobs:
         run: |
           security delete-keychain "$KEYCHAIN" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/cert.p12"
+
+  # pages.yml will NOT fire for the appcast commit above: GitHub suppresses
+  # workflow triggers for pushes made with GITHUB_TOKEN. Without this job the
+  # appcast lands in git and never deploys — Sparkle would keep serving the
+  # previous version, silently.
+  appcast:
+    needs: release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages           # must match pages.yml, or the two can race
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main          # the appcast commit is on main, not on the tag
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5

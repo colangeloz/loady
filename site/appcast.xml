@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sparkle's update feed. Served from https://loady.colangelo.me/appcast.xml,
+     which the app has in SUFeedURL. Items are prepended by the release
+     workflow; the downloads themselves live on GitHub Releases.
+
+     v0.1.0 is deliberately absent: it shipped CFBundleVersion=1, which sorts
+     above every later version. Never backfill it. -->
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Loady</title>
+    <link>https://loady.colangelo.me/</link>
+    <description>Loady updates</description>
+    <language>en</language>
+  </channel>
+</rss>

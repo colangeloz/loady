@@ -12,16 +12,43 @@ struct PreferencesView: View {
     /// ideal height instead.
     static let width: CGFloat = 460
 
+    /// Called with the height the selected tab wants. The window sets its own
+    /// frame from this; letting AppKit negotiate it with the hosting view
+    /// recurses until it throws.
+    let onHeightChange: (CGFloat) -> Void
+
+    @State private var selection: Tab = .general
+
+    private enum Tab: Hashable {
+        case general, updates, about
+
+        /// Measured, not computed: a grouped Form has no intrinsic height, and
+        /// asking AppKit to work it out is what caused the layout recursion.
+        var windowHeight: CGFloat {
+            switch self {
+            case .general: 150
+            case .updates: 210
+            case .about:   330
+            }
+        }
+    }
+
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             GeneralTab()
+                .tag(Tab.general)
                 .tabItem { Label("General", systemImage: "gearshape") }
             UpdatesTab()
+                .tag(Tab.updates)
                 .tabItem { Label("Updates", systemImage: "arrow.trianglehead.2.clockwise") }
             AboutTab()
+                .tag(Tab.about)
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: Self.width)
+        .onChange(of: selection, initial: true) { _, tab in
+            onHeightChange(tab.windowHeight)
+        }
     }
 }
 
@@ -76,29 +103,13 @@ private struct UpdatesTab: View {
                 LabeledContent("Current version") {
                     Text(updates.currentVersion).monospacedDigit()
                 }
-                Toggle("Check on launch", isOn: $updates.checkOnLaunch)
-                HStack {
-                    Button("Check Now") {
-                        Task { await updates.check() }
-                    }
-                    .disabled(updates.state == .checking)
-
-                    switch updates.state {
-                    case .idle:
-                        EmptyView()
-                    case .checking:
-                        ProgressView().controlSize(.small)
-                    case .upToDate:
-                        Text("Up to date.").foregroundStyle(.secondary)
-                    case let .available(version, url):
-                        Link("\(version) is available", destination: url)
-                    case let .failed(reason):
-                        Text(reason).foregroundStyle(.red).lineLimit(2)
-                    }
-                }
+                Toggle("Check for updates automatically",
+                       isOn: Binding(get: { updates.checksAutomatically },
+                                     set: { updates.checksAutomatically = $0 }))
+                Button("Check Now") { updates.check() }
+                    .disabled(!updates.canCheck)
             } footer: {
-                Text("This is the only part of Loady that uses the network, and "
-                     + "it asks GitHub for the latest release number and nothing else. "
+                Text("This is the only part of Loady that uses the network. "
                      + "Off unless you turn it on.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -148,5 +159,5 @@ private struct AboutTab: View {
 }
 
 #if DEBUG
-#Preview("Preferences") { PreferencesView() }
+#Preview("Preferences") { PreferencesView { _ in } }
 #endif

@@ -28,9 +28,21 @@ final class PreferencesWindowController {
             defer: false
         )
         window.title = "Loady Preferences"
-        let hosting = NSHostingController(rootView: PreferencesView())
-        // Without this the window is sized once, at first layout.
-        hosting.sizingOptions = [.preferredContentSize]
+        // NOT `sizingOptions = [.preferredContentSize]`. That makes the window
+        // track the content, but the resize makes NSHostingView invalidate,
+        // which asks for another resize — an unbounded loop that AppKit turns
+        // into an uncaught NSGenericException on the first tab switch.
+        // The view reports its height instead, and this sets it once.
+        let hosting = NSHostingController(rootView: PreferencesView { [weak window] contentHeight in
+            guard let window else { return }
+            guard abs(window.contentLayoutRect.height - contentHeight) > 0.5 else { return }
+            let top = window.frame.maxY
+            window.setContentSize(NSSize(width: PreferencesView.width, height: contentHeight))
+            // Keep the title bar where it is; a centred resize makes the window
+            // appear to jump when you switch tabs.
+            window.setFrameOrigin(NSPoint(x: window.frame.origin.x,
+                                          y: top - window.frame.height))
+        })
         window.contentViewController = hosting
         window.isReleasedWhenClosed = false
         window.center()

@@ -1,93 +1,95 @@
 import Foundation
-import SystemMetrics
+import Sparkle
 
-/// Asks GitHub whether a newer release exists.
+/// In-app updates, via Sparkle.
 ///
-/// **This is the only code in Loady that touches the network, and it is off
-/// until you turn it on.** Nothing here runs at launch unless `checkOnLaunch`
-/// is enabled, and a manual check happens only when you press the button.
-///
-/// It reports an update; it does not install one. Installing in place means
-/// Sparkle — an appcast, an EdDSA key, and a framework that phones home on a
-/// schedule. That trade is worth making deliberately, not by accident.
+/// **The only code in Loady that touches the network, and it is off until you
+/// turn it on.** `SUEnableAutomaticChecks` is `NO` in Info.plist, which both
+/// disables scheduled checks and suppresses Sparkle's second-launch prompt.
 @MainActor
 @Observable
 final class UpdateChecker {
 
     static let shared = UpdateChecker()
 
-    enum State: Equatable {
-        case idle
-        case checking
-        case upToDate
-        case available(version: String, url: URL)
-        case failed(String)
-    }
+    private let controller: SPUStandardUpdaterController
+    private let observer = AutomaticChecksObserver()
 
-    private(set) var state: State = .idle
+    private var updater: SPUUpdater { controller.updater }
 
-    /// Persisted, and false by default. Opting in is what makes the network
-    /// claim in the README precise rather than a lie.
-    var checkOnLaunch: Bool {
-        didSet { Preferences.shared.checkForUpdatesOnLaunch = checkOnLaunch }
-    }
-
-    private let releasesAPI = URL(string: "https://api.github.com/repos/colangeloz/loady/releases/latest")!
+    /// Mirrors `updater.canCheckForUpdates`, which is KVO rather than
+    /// `@Observable` and so would not invalidate a SwiftUI view on its own.
+    private(set) var canCheck = true
 
     private init() {
-        checkOnLaunch = Preferences.shared.checkForUpdatesOnLaunch
+        controller = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: GentleReminders.shared
+        )
+        // Never install anything without asking.
+        updater.automaticallyDownloadsUpdates = false
+        observer.start(updater: updater) { [weak self] in self?.canCheck = $0 }
     }
 
     var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
 
-    func checkIfEnabled() async {
-        guard checkOnLaunch else { return }
-        await check()
+    /// Bound straight to Sparkle rather than mirrored into our own defaults:
+    /// two stores for one setting drift, and Sparkle needs its copy anyway.
+    var checksAutomatically: Bool {
+        get { updater.automaticallyChecksForUpdates }
+        set { updater.automaticallyChecksForUpdates = newValue }
     }
 
-    func check() async {
-        state = .checking
-        do {
-            var request = URLRequest(url: releasesAPI)
-            request.timeoutInterval = 15
-            // GitHub rejects unidentified clients, and asking for the versioned
-            // media type stops a future API default from changing the shape.
-            request.setValue("Loady/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+    /// User-initiated: always shows UI, including "you're up to date".
+    func check() {
+        updater.checkForUpdates()
+    }
+}
 
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                state = .failed("GitHub returned \(code)")
-                return
-            }
+/// Bridges the updater's KVO property into `@Observable`.
+private final class AutomaticChecksObserver: NSObject {
+    private var token: NSKeyValueObservation?
 
-            let release = try JSONDecoder().decode(Release.self, from: data)
-            guard let latest = SemanticVersion(release.tagName),
-                  let current = SemanticVersion(currentVersion) else {
-                state = .failed("Could not read the version number")
-                return
-            }
-
-            if latest > current, let url = URL(string: release.htmlURL) {
-                state = .available(version: release.tagName, url: url)
-            } else {
-                state = .upToDate
-            }
-        } catch {
-            state = .failed(error.localizedDescription)
+    @MainActor
+    func start(updater: SPUUpdater, onChange: @escaping @MainActor (Bool) -> Void) {
+        onChange(updater.canCheckForUpdates)
+        token = updater.observe(\.canCheckForUpdates, options: [.new]) { updater, _ in
+            let value = updater.canCheckForUpdates
+            Task { @MainActor in onChange(value) }
         }
     }
+}
 
-    private struct Release: Decodable {
-        let tagName: String
-        let htmlURL: String
+/// Without this, a scheduled update alert is effectively invisible.
+///
+/// Sparkle will not let a scheduled alert steal focus, so it appears *behind*
+/// other windows — and an LSUIElement app has no Dock icon and no window of
+/// its own, so nothing tells the user an update exists.
+@MainActor
+final class GentleReminders: NSObject, SPUStandardUserDriverDelegate {
 
-        enum CodingKeys: String, CodingKey {
-            case tagName = "tag_name"
-            case htmlURL = "html_url"
-        }
+    static let shared = GentleReminders()
+
+    /// Set while an update is waiting and the alert is not in front, so the
+    /// status item can say so.
+    private(set) var updateIsWaiting = false
+
+    nonisolated var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool,
+        forUpdate update: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        // A user-initiated check is already in front of them; only a scheduled
+        // one needs the menu bar to carry the news.
+        updateIsWaiting = !state.userInitiated
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        updateIsWaiting = false
     }
 }

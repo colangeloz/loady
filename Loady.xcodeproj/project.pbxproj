@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		CA1F8EF13054B186007C01C5 /* SystemMetrics in Frameworks */ = {isa = PBXBuildFile; productRef = CA1F8EF03054B186007C01C5 /* SystemMetrics */; };
+		CA7044C33058862C008182D6 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CA7044C23058862C008182D6 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA1F8EF13054B186007C01C5 /* SystemMetrics in Frameworks */,
+				CA7044C33058862C008182D6 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = Loady;
 			packageProductDependencies = (
 				CA1F8EF03054B186007C01C5 /* SystemMetrics */,
+				CA7044C23058862C008182D6 /* Sparkle */,
 			);
 			productName = Loady;
 			productReference = CA99F672304CDB4E00CFD25A /* Loady.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CA1F8EEF3054B186007C01C5 /* XCLocalSwiftPackageReference "Core" */,
+				CA7044C13058862C008182D6 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CA99F673304CDB4E00CFD25A /* Products */;
@@ -271,6 +275,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Loady/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -302,6 +307,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Loady/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -352,10 +358,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		CA7044C13058862C008182D6 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		CA1F8EF03054B186007C01C5 /* SystemMetrics */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SystemMetrics;
+		};
+		CA7044C23058862C008182D6 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CA7044C13058862C008182D6 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

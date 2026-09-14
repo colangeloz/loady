@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Only keys Xcode will not synthesise. INFOPLIST_KEY_* is an allowlist of
+	     Apple-known keys, not a passthrough: INFOPLIST_KEY_SUFeedURL is dropped
+	     silently. Everything else is still generated and merged into this file. -->
+
+	<key>SUFeedURL</key>
+	<string>https://loady.colangelo.me/appcast.xml</string>
+
+	<!-- Disables scheduled checks AND suppresses Sparkle's second-launch
+	     "may I check automatically?" prompt. This is what keeps the app silent
+	     on the network unless someone opts in. -->
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+
+	<!-- Already the default; explicit so it is auditable. The one Sparkle
+	     feature that would append system stats to the feed URL. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+
+	<!-- The public half of the EdDSA keypair. The private half is in the login
+	     keychain and must never leave it unencrypted: losing it means every
+	     installed copy rejects all future updates, with no recovery. -->
+	<key>SUPublicEDKey</key>
+	<string>hoMJ1TWscUPF0Ks/TXEW7Nt+Ltv3KZmKdkZs6NKIjzA=</string>
+</dict>
+</plist>

@@ -20,8 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem = StatusItemController()
 
-        // Only if the user asked for it; see UpdateChecker.
-        Task { await UpdateChecker.shared.checkIfEnabled() }
+        // Sparkle schedules its own checks; this just starts the updater.
+        _ = UpdateChecker.shared
     }
 
     // The app has no windows, so there is no "last window closed" moment.

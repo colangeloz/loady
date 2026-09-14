@@ -41,12 +41,6 @@ final class Preferences {
         set { defaults.set(newValue, forKey: "menubar.showValues") }
     }
 
-    /// Off by default, deliberately: the app makes no network connections
-    /// until someone asks it to.
-    var checkForUpdatesOnLaunch: Bool {
-        get { defaults.bool(forKey: "updates.checkOnLaunch") }
-        set { defaults.set(newValue, forKey: "updates.checkOnLaunch") }
-    }
 
     private let orderKey = "module.order"
 

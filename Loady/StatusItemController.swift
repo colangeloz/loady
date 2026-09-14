@@ -207,6 +207,17 @@ final class StatusItemController {
 
     private func showContextMenu() {
         let menu = NSMenu()
+
+        // Sparkle will not let a scheduled alert steal focus, so on an
+        // LSUIElement app it can sit behind every window unseen. This is the
+        // only place the user would find out.
+        if GentleReminders.shared.updateIsWaiting {
+            menu.addItem(withTitle: "Update Available…",
+                         action: #selector(installUpdate),
+                         keyEquivalent: "").target = self
+            menu.addItem(.separator())
+        }
+
         menu.addItem(withTitle: "Preferences…",
                      action: #selector(openPreferences),
                      keyEquivalent: ",").target = self
@@ -220,6 +231,10 @@ final class StatusItemController {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    @objc private func installUpdate() {
+        UpdateChecker.shared.check()
     }
 
     @objc private func openPreferences() {

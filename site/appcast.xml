@@ -13,5 +13,21 @@
     <link>https://loady.colangelo.me/</link>
     <description>Loady updates</description>
     <language>en</language>
+    <item>
+      <title>Loady 0.2.0</title>
+      <link>https://github.com/colangeloz/loady/releases/tag/v0.2.0</link>
+      <sparkle:version>0.2.0</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 14 Sep 2026 21:14:33 +0000</pubDate>
+      <description><![CDATA[
+<ul><li>Full Changelog**: https://github.com/colangeloz/loady/compare/v0.1.0...v0.2.0</li></ul>
+      ]]></description>
+      <enclosure
+        url="https://github.com/colangeloz/loady/releases/download/v0.2.0/Loady-0.2.0.zip"
+        length="1748307"
+        type="application/octet-stream"
+        sparkle:edSignature="SfzoCCXvODrSIUjurcCmwxH2b3Ic8hbrcFIFTbWWkGpsvTAa2A197CzbbOwElMgoLB3mZ5t+A2+IYR6IlxK+CA==" />
+    </item>
   </channel>
 </rss>

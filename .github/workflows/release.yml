@@ -14,8 +14,7 @@ on:
 
 permissions:
   contents: write        # create the Release, upload artifacts, push the appcast
-  pages: write           # deploy the appcast — see "Publish the appcast" below
-  id-token: write
+  actions: write         # dispatch pages.yml — see "Publish the appcast" below
 
 jobs:
   release:
@@ -139,6 +138,19 @@ jobs:
           git commit -m "chore: add v$V to the appcast" || { echo "nothing to commit"; exit 0; }
           git push origin main
 
+      # Not a job with `environment: github-pages` in this workflow: environment
+      # protection evaluates the RUN's ref, which is the tag, and the
+      # github-pages environment only admits the default branch — so such a job
+      # is rejected however it checks out. Dispatching pages.yml instead runs
+      # the deploy in main's own context.
+      #
+      # pages.yml does not fire on its own for the appcast commit above:
+      # GitHub suppresses workflow triggers for pushes made with GITHUB_TOKEN.
+      - name: Publish the appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
+
       # Runs even when an earlier step failed: a signing key must never outlive
       # the job, however the job ended.
       - name: Remove the keychain
@@ -146,27 +158,3 @@ jobs:
         run: |
           security delete-keychain "$KEYCHAIN" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/cert.p12"
-
-  # pages.yml will NOT fire for the appcast commit above: GitHub suppresses
-  # workflow triggers for pushes made with GITHUB_TOKEN. Without this job the
-  # appcast lands in git and never deploys — Sparkle would keep serving the
-  # previous version, silently.
-  appcast:
-    needs: release
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pages           # must match pages.yml, or the two can race
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: main          # the appcast commit is on main, not on the tag
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v5

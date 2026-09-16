@@ -13,12 +13,12 @@
 <style>
   :root {
     --bg: #fbfbfd; --fg: #1d1d1f; --muted: #6e6e73;
-    --line: rgba(0,0,0,.08); --card: #fff; --accent: #34c759;
+    --line: rgba(0,0,0,.08); --card: #fff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #000; --fg: #f5f5f7; --muted: #86868b;
-      --line: rgba(255,255,255,.12); --card: #1c1c1e; --accent: #30d158;
+      --line: rgba(255,255,255,.12); --card: #1c1c1e;
     }
   }
   * { box-sizing: border-box; }
@@ -28,9 +28,13 @@
     -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
-  header { text-align: center; padding: 88px 0 56px; }
-  header img.icon { width: 112px; height: 112px; border-radius: 24px; }
-  h1 { font-size: 48px; line-height: 1.08; letter-spacing: -.02em; margin: 24px 0 8px; font-weight: 600; }
+  header {
+    display: flex; align-items: center; gap: 48px;
+    padding: 72px 0 64px;
+  }
+  .intro { flex: 1 1 320px; }
+  header img.icon { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { font-size: 46px; line-height: 1.08; letter-spacing: -.02em; margin: 20px 0 8px; font-weight: 600; }
   .tagline { font-size: 21px; color: var(--muted); margin: 0 0 32px; }
   .cta {
     display: inline-flex; align-items: center; gap: 8px;
@@ -38,14 +42,29 @@
     padding: 13px 26px; border-radius: 980px; font-weight: 500; font-size: 17px;
   }
   .cta:hover { opacity: .85; }
-  .req { margin-top: 12px; font-size: 14px; color: var(--muted); }
-  .shot { margin: 8px 0 64px; text-align: center; }
-  .shot img { max-width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+  .actions { display: flex; align-items: center; gap: 14px; }
+  .ghlink {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 1px solid var(--line); color: var(--fg); text-decoration: none;
+  }
+  .ghlink:hover { background: var(--card); }
+  .req { margin-top: 22px; font-size: 14px; color: var(--muted); }
+  .shot { flex: 0 0 auto; display: flex; }
+  .shot video {
+    height: 450px; max-height: 62vh; width: auto; max-width: 100%;
+    border-radius: 14px; border: 1px solid var(--line);
+    box-shadow: 0 18px 48px rgba(0,0,0,.12);
+  }
   h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 56px 0 16px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
-  .card h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
-  .card p { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
+  .specs { margin: 0; }
+  .specs .row {
+    display: flex; gap: 24px; align-items: baseline;
+    padding: 15px 0; border-bottom: 1px solid var(--line);
+  }
+  .specs .row:last-child { border-bottom: 0; }
+  .specs dt { flex: 0 0 92px; font-weight: 600; font-size: 16px; }
+  .specs dd { margin: 0; font-size: 16px; color: var(--muted); line-height: 1.45; }
   ul.plain { list-style: none; padding: 0; margin: 0; }
   ul.plain li { padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
   ul.plain li:last-child { border-bottom: 0; }
@@ -56,36 +75,51 @@
            font-size: 15px; color: var(--muted); }
   footer a { color: var(--muted); text-decoration: none; }
   footer a:hover { color: var(--fg); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
+  @media (max-width: 860px) {
+    header { flex-direction: column; text-align: center; gap: 36px; padding: 64px 0 48px; }
+    .actions { justify-content: center; }
+    .specs .row { flex-direction: column; gap: 4px; text-align: left; }
+    .shot video { height: 460px; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <img class="icon" src="icon.png" alt="">
-    <h1>Loady</h1>
-    <p class="tagline">Your Mac's vital signs, in the menu bar.</p>
-    <a class="cta" href="https://github.com/colangeloz/loady/releases/latest/download/Loady.dmg">Download for macOS</a>
-    <p class="req">macOS 14 or later · Apple Silicon and Intel · free and open source</p>
+    <div class="intro">
+      <img class="icon" src="icon.png" alt="">
+      <h1>Loady</h1>
+      <p class="tagline">Your Mac's vital signs, in the menu bar.</p>
+      <div class="actions">
+        <a class="cta" href="https://github.com/colangeloz/loady/releases/latest/download/Loady.dmg">Download for macOS</a>
+        <a class="ghlink" href="https://github.com/colangeloz/loady"
+           aria-label="Loady source on GitHub" title="Source on GitHub">
+          <svg viewBox="0 0 16 16" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        </a>
+      </div>
+      <p class="req">macOS 14 or later · Apple Silicon and Intel · free and open source</p>
+    </div>
+
+    <div class="shot">
+      <video src="loady-popup.mp4" poster="loady-popup.jpg"
+             autoplay muted loop playsinline
+             aria-label="Loady in the macOS menu bar, showing live CPU, disk, memory, network and GPU readings"></video>
+    </div>
   </header>
 
-  <div class="shot">
-    <img src="loady.gif" alt="Loady showing CPU and memory usage in the macOS menu bar">
-  </div>
-
   <h2>What it shows</h2>
-  <div class="grid">
-    <div class="card"><h3>CPU</h3><p>Load per core and per performance tier, read straight from the kernel.</p></div>
-    <div class="card"><h3>Memory</h3><p>App, wired and compressed, reconciled with Activity Monitor.</p></div>
-    <div class="card"><h3>Disk</h3><p>Capacity and throughput, with APFS containers counted once.</p></div>
-    <div class="card"><h3>GPU</h3><p>Utilization and memory in use, per device.</p></div>
-    <div class="card"><h3>Network</h3><p>Throughput up and down, from 64-bit interface counters that do not wrap.</p></div>
-  </div>
+  <dl class="specs">
+    <div class="row"><dt>CPU</dt><dd>Load per core and per performance tier, read straight from the kernel.</dd></div>
+    <div class="row"><dt>Memory</dt><dd>App, wired and compressed, reconciled with Activity Monitor.</dd></div>
+    <div class="row"><dt>Disk</dt><dd>Capacity and throughput, with APFS containers counted once.</dd></div>
+    <div class="row"><dt>Network</dt><dd>Throughput up and down, from 64-bit interface counters that do not wrap.</dd></div>
+    <div class="row"><dt>GPU</dt><dd>Utilization and memory in use, per device.</dd></div>
+  </dl>
 
   <h2>Why you might trust it</h2>
   <ul class="plain">
-    <li><b><span class="dot"></span> Silent on the network by default.</b>
+    <li><b>Silent on the network by default.</b>
         <span>— no telemetry, no analytics, no phoning home. The one exception is
         checking GitHub for a new version, which is off until you switch it on.</span></li>
     <li><b>Signed and notarized by Apple.</b>

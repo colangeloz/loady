@@ -3,7 +3,7 @@
 A macOS menu bar system monitor, written from scratch in Swift 6.
 
 <p align="center">
-  <img src="Docs/images/loady.gif" alt="Loady in the menu bar, showing CPU and memory">
+  <img src="Docs/images/loady.gif" alt="Loady in the macOS menu bar, showing live CPU, disk, memory, network and GPU readings">
 </p>
 
 <p align="center">

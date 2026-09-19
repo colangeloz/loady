@@ -46,6 +46,10 @@ final class StatusItemController {
         registry.sync()
         startRefreshing()
         watchForSleep()
+
+        PreferencesWindowController.shared.dismissPopup = { [weak self] in
+            self?.closePanel()
+        }
     }
 
     deinit {

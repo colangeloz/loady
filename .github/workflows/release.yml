@@ -109,10 +109,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            "$DMG_PATH" "$ZIP_PATH" \
-            --title "${{ steps.version.outputs.tag }}" \
-            --generate-notes
+          TAG="${{ steps.version.outputs.tag }}"
+          # Creating a release in the GitHub UI also creates the tag, which
+          # fires this workflow — and `create` then fails on the release that
+          # same gesture just made, leaving it published with no assets and
+          # every /releases/latest/download URL 404ing. Upload to whatever is
+          # already there instead.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — uploading assets to it"
+            gh release upload "$TAG" "$DMG_PATH" "$ZIP_PATH" --clobber
+          else
+            gh release create "$TAG" \
+              "$DMG_PATH" "$ZIP_PATH" \
+              --title "$TAG" \
+              --generate-notes
+          fi
 
       # After the release exists: the enclosure URL 404s until the asset is up.
       - name: Update the appcast
